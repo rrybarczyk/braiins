@@ -20,8 +20,7 @@
 // of such proprietary license or if you have any other questions, please
 // contact us at opensource@braiins.com.
 
-use crate::error::{self, ErrorKind};
-use crate::i2c::{self, Address};
+use crate::i2c::{Address, Bus};
 
 use async_trait::async_trait;
 
@@ -66,7 +65,7 @@ impl FakeI2cBus {
 }
 
 #[async_trait]
-impl i2c::AsyncBus for FakeI2cBus {
+impl Bus for FakeI2cBus {
     /// Read register from device on I2C bus
     /// if `addr` doesn't match `respond_addr`, return default read byte or error
     /// if `reg` isn't enabled on device, return error

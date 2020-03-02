@@ -20,9 +20,8 @@
 // of such proprietary license or if you have any other questions, please
 // contact us at opensource@braiins.com.
 
-//! Purpose of this module: I2C bus interface defition - AsyncBus and AsyncDevice
+//! Async I2C bus interface defition and utility functions
 
-#[cfg(test)]
 pub mod test_utils;
 
 use async_trait::async_trait;
@@ -32,7 +31,8 @@ use std::sync::Arc;
 use futures::lock::Mutex;
 use ii_async_compat::futures;
 
-use crate::error::{self, ErrorKind};
+/// Local error definition
+enum Error {}
 
 /// Struct representing I2C address
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -60,9 +60,9 @@ impl fmt::Display for Address {
     }
 }
 
-/// `AsyncBus` represents ops on async I2C bus
+/// `Bus` represents ops on async I2C bus
 #[async_trait]
-pub trait AsyncBus
+pub trait Bus
 where
     Self: Sync + Send,
 {
@@ -71,42 +71,9 @@ where
     async fn write(&mut self, addr: Address, reg: u8, val: u8) -> error::Result<()>;
 }
 
-/// We can make any bus shared by wrapping it in a lock
-#[derive(Clone)]
-pub struct SharedBus<T> {
-    inner: Arc<Mutex<T>>,
-}
-
-impl<T> SharedBus<T>
-where
-    T: AsyncBus,
-{
-    pub fn new(bus: T) -> Self {
-        Self {
-            inner: Arc::new(Mutex::new(bus)),
-        }
-    }
-}
-
+/// `Device` represents (async) ops on a device on I2C bus
 #[async_trait]
-impl<T> AsyncBus for SharedBus<T>
-where
-    T: AsyncBus,
-{
-    async fn read(&mut self, addr: Address, reg: u8) -> error::Result<u8> {
-        let mut bus = self.inner.lock().await;
-        bus.read(addr, reg).await
-    }
-
-    async fn write(&mut self, addr: Address, reg: u8, val: u8) -> error::Result<()> {
-        let mut bus = self.inner.lock().await;
-        bus.write(addr, reg, val).await
-    }
-}
-
-/// `AsyncDevice` represents (async) ops on a device on I2C bus
-#[async_trait]
-pub trait AsyncDevice
+pub trait Device
 where
     Self: Sync + Send,
 {
@@ -129,23 +96,23 @@ where
 
 /// We can make a `Device` by tying together some kind of bus (T) and I2C address
 #[derive(Clone)]
-pub struct Device<T> {
+pub struct DeviceOnBus<T> {
     bus: T,
     address: Address,
 }
 
-impl<T> Device<T> {
+impl<T> DeviceOnBus<T> {
     pub fn new(bus: T, address: Address) -> Self {
         Self { bus, address }
     }
 }
 
-/// We can implement async ops on `Device` just by passing down the operation
+/// We can implement async ops on `DeviceOnBus` just by passing down the operation
 /// to I2C bus together with I2C address.
 #[async_trait]
-impl<T> AsyncDevice for Device<T>
+impl<T> Device for DeviceOnBus<T>
 where
-    T: Clone + AsyncBus,
+    T: Clone + Bus,
 {
     async fn read(&mut self, reg: u8) -> error::Result<u8> {
         self.bus.read(self.address, reg).await
@@ -161,7 +128,7 @@ where
 
     /// TODO: Maybe, just maybe find a better place where to put this function.
     ///
-    /// TODO: Maybe make this function a default implementation for `AsyncDevice` trait -
+    /// TODO: Maybe make this function a default implementation for `Device` trait -
     /// it doesn't currently work because of https://github.com/rust-lang/rust/issues/51443
     /// which is due to `async-trait` conversion.
     async fn write_readback(&mut self, reg: u8, reg_read_back: u8, val: u8) -> error::Result<()> {
@@ -174,6 +141,39 @@ where
             )))?
         }
         Ok(())
+    }
+}
+
+/// We can make any bus shared by wrapping it in a lock
+#[derive(Clone)]
+pub struct SharedBus<T> {
+    inner: Arc<Mutex<T>>,
+}
+
+impl<T> SharedBus<T>
+where
+    T: Bus,
+{
+    pub fn new(bus: T) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(bus)),
+        }
+    }
+}
+
+#[async_trait]
+impl<T> Bus for SharedBus<T>
+where
+    T: Bus,
+{
+    async fn read(&mut self, addr: Address, reg: u8) -> error::Result<u8> {
+        let mut bus = self.inner.lock().await;
+        bus.read(addr, reg).await
+    }
+
+    async fn write(&mut self, addr: Address, reg: u8, val: u8) -> error::Result<()> {
+        let mut bus = self.inner.lock().await;
+        bus.write(addr, reg, val).await
     }
 }
 
@@ -203,8 +203,8 @@ mod test {
     #[tokio::test]
     async fn test_i2c_device_bus() {
         let bus = test_utils::FakeI2cBus::new(Address::new(0x16), &[], Some(0), Some(0x7f));
-        let mut dev_bad = Device::new(bus.clone(), Address::new(0x14));
-        let mut dev = Device::new(bus, Address::new(0x16));
+        let mut dev_bad = DeviceOnBus::new(bus.clone(), Address::new(0x14));
+        let mut dev = DeviceOnBus::new(bus, Address::new(0x16));
 
         dev.write(6, 0x5a).await.unwrap();
         assert_eq!(dev.read(6).await.unwrap(), 0x5a);
@@ -217,7 +217,7 @@ mod test {
 
         // should return error on reads/writes
         let bus = test_utils::FakeI2cBus::new(Address::new(0x16), &[], Some(0), None);
-        let mut dev = Device::new(bus, Address::new(0x14));
+        let mut dev = DeviceOnBus::new(bus, Address::new(0x14));
         assert!(dev.write_readback(5, 5, 0x10).await.is_err());
 
         // some registers could be poisoned
@@ -227,7 +227,7 @@ mod test {
             None,
             None,
         );
-        let mut dev = Device::new(bus, Address::new(0x16));
+        let mut dev = DeviceOnBus::new(bus, Address::new(0x16));
         assert_eq!(dev.read(3).await.unwrap(), 10);
         assert!(dev.write(3, 11).await.is_ok());
         assert!(dev.read(4).await.is_err());
@@ -242,8 +242,8 @@ mod test {
         // Now we wrap it in a `SharedBus`, getting something we can clone while
         // getting shared backing registers.
         let shared_bus = SharedBus::new(bus);
-        let mut dev1 = Device::new(shared_bus.clone(), Address::new(0x16));
-        let mut dev2 = Device::new(shared_bus.clone(), Address::new(0x16));
+        let mut dev1 = DeviceOnBus::new(shared_bus.clone(), Address::new(0x16));
+        let mut dev2 = DeviceOnBus::new(shared_bus.clone(), Address::new(0x16));
 
         // writes by one device on the bus ...
         dev1.write(3, 0x11).await.unwrap();
