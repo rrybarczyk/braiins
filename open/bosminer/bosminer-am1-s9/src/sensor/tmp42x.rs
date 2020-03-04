@@ -23,8 +23,8 @@
 //! Driver implementation of sensor driver for TMP42x and similar sensors
 
 use crate::error;
-use crate::i2c;
 use crate::sensor::{self, Measurement, Temperature};
+use ii_async_i2c as i2c;
 
 use packed_struct::prelude::*;
 use packed_struct_codegen::PackedStruct;
@@ -76,7 +76,7 @@ pub struct RegTempLowByte {
 
 /// TMP421/422/423 driver
 pub struct TMP42x {
-    i2c_device: Box<dyn i2c::AsyncDevice>,
+    i2c_device: Box<dyn i2c::Device>,
     /// We intend to support chips with multiple remote temperature sensors in the future.
     /// This registers defines how many remote sensors we are connected to.
     #[allow(dead_code)]
@@ -88,7 +88,7 @@ pub struct TMP42x {
 
 impl TMP42x {
     pub fn new(
-        i2c_device: Box<dyn i2c::AsyncDevice>,
+        i2c_device: Box<dyn i2c::Device>,
         num_remote_sensors: usize,
     ) -> Box<dyn sensor::Sensor> {
         // TODO: If you are fixing this, you need to figure out sensor topology on hashboard

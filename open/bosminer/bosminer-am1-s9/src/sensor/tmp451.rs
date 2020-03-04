@@ -23,8 +23,8 @@
 //! Driver implementation of sensor driver for TMP451 and similar sensors
 
 use crate::error;
-use crate::i2c;
 use crate::sensor::{self, Measurement, Temperature};
+use ii_async_i2c as i2c;
 
 use async_trait::async_trait;
 use std::boxed::Box;
@@ -53,7 +53,7 @@ fn make_temp(whole: u8, fract: u8) -> f32 {
 ///   It makes sense even for sensors that are precise +- 1 degree (because they
 ///   have internal filtering.
 async fn read_temperature(
-    i2c_dev: &mut Box<dyn i2c::AsyncDevice>,
+    i2c_dev: &mut Box<dyn i2c::Device>,
     use_fract: bool,
 ) -> error::Result<Temperature> {
     let status = i2c_dev.read(REG_STATUS).await?;
@@ -84,9 +84,7 @@ async fn read_temperature(
 }
 
 /// Read only local temperature
-async fn read_temperature_local(
-    i2c_dev: &mut Box<dyn i2c::AsyncDevice>,
-) -> error::Result<Temperature> {
+async fn read_temperature_local(i2c_dev: &mut Box<dyn i2c::Device>) -> error::Result<Temperature> {
     let local_temp = i2c_dev.read(REG_LOCAL_TEMP).await?;
 
     Ok(Temperature {
@@ -95,7 +93,7 @@ async fn read_temperature_local(
     })
 }
 
-async fn generic_init(i2c_dev: &mut Box<dyn i2c::AsyncDevice>) -> error::Result<()> {
+async fn generic_init(i2c_dev: &mut Box<dyn i2c::Device>) -> error::Result<()> {
     i2c_dev
         .write_readback(REG_CONFIG_W, REG_CONFIG, CONFIG_RANGE)
         .await?;
@@ -105,11 +103,11 @@ async fn generic_init(i2c_dev: &mut Box<dyn i2c::AsyncDevice>) -> error::Result<
 
 /// TMP451 driver (most common type, has remote sensor)
 pub struct TMP451 {
-    i2c_dev: Box<dyn i2c::AsyncDevice>,
+    i2c_dev: Box<dyn i2c::Device>,
 }
 
 impl TMP451 {
-    pub fn new(i2c_dev: Box<dyn i2c::AsyncDevice>) -> Box<dyn sensor::Sensor> {
+    pub fn new(i2c_dev: Box<dyn i2c::Device>) -> Box<dyn sensor::Sensor> {
         Box::new(Self { i2c_dev }) as Box<dyn sensor::Sensor>
     }
 }
@@ -127,11 +125,11 @@ impl sensor::Sensor for TMP451 {
 
 /// ADT7461 driver (almost the same as TMP451)
 pub struct ADT7461 {
-    i2c_dev: Box<dyn i2c::AsyncDevice>,
+    i2c_dev: Box<dyn i2c::Device>,
 }
 
 impl ADT7461 {
-    pub fn new(i2c_dev: Box<dyn i2c::AsyncDevice>) -> Box<dyn sensor::Sensor> {
+    pub fn new(i2c_dev: Box<dyn i2c::Device>) -> Box<dyn sensor::Sensor> {
         Box::new(Self { i2c_dev }) as Box<dyn sensor::Sensor>
     }
 }
@@ -149,11 +147,11 @@ impl sensor::Sensor for ADT7461 {
 
 /// NCT218 driver (only local temperature)
 pub struct NCT218 {
-    i2c_dev: Box<dyn i2c::AsyncDevice>,
+    i2c_dev: Box<dyn i2c::Device>,
 }
 
 impl NCT218 {
-    pub fn new(i2c_dev: Box<dyn i2c::AsyncDevice>) -> Box<dyn sensor::Sensor> {
+    pub fn new(i2c_dev: Box<dyn i2c::Device>) -> Box<dyn sensor::Sensor> {
         Box::new(Self { i2c_dev }) as Box<dyn sensor::Sensor>
     }
 }
@@ -178,16 +176,16 @@ mod test {
     /// Make sensor T with data being read/written from memory `data`
     fn make_i2c_device(
         data: &[InitReg],
-    ) -> i2c::Device<i2c::SharedBus<i2c::test_utils::FakeI2cBus>> {
+    ) -> i2c::DeviceOnBus<i2c::SharedBus<i2c::test_utils::FakeI2cBus>> {
         let addr = i2c::Address::new(0x16);
         // poison all registers except those we define
         let bus = i2c::test_utils::FakeI2cBus::new(addr, data, None, None);
         let bus = i2c::SharedBus::new(bus);
 
-        i2c::Device::new(bus, addr)
+        i2c::DeviceOnBus::new(bus, addr)
     }
 
-    async fn check_config_ok<T: i2c::AsyncDevice>(dev: &mut T) {
+    async fn check_config_ok<T: i2c::Device>(dev: &mut T) {
         assert_eq!(
             dev.read(REG_CONFIG_W).await.unwrap() & CONFIG_RANGE,
             CONFIG_RANGE

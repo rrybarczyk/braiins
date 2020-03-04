@@ -25,6 +25,7 @@
 use failure::{Backtrace, Context, Fail};
 use std::fmt::{self, Debug, Display};
 
+use ii_async_i2c as i2c;
 use std::io;
 use sysfs_gpio;
 use uio_async;
@@ -213,6 +214,12 @@ impl From<sysfs_gpio::Error> for Error {
         Self {
             inner: gpio_error.context(ErrorKind::Gpio(msg)),
         }
+    }
+}
+
+impl From<i2c::Error> for Error {
+    fn from(e: i2c::Error) -> Self {
+        ErrorKind::I2c(format!("{:?}", e)).into()
     }
 }
 

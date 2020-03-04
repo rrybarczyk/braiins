@@ -40,7 +40,7 @@ mod tmp42x;
 mod tmp451;
 
 use crate::error;
-use crate::i2c;
+use ii_async_i2c as i2c;
 
 use async_trait::async_trait;
 use ii_logging::macros::*;
@@ -112,7 +112,7 @@ pub const INVALID_TEMPERATURE_READING: Temperature = Temperature {
 /// is pretty much ad-hoc (see for example `lm90` driver in Linux kernel) and would require
 /// changes to the "probe API" with each new sensor.
 pub async fn probe_i2c_device(
-    mut i2c_device: Box<dyn i2c::AsyncDevice>,
+    mut i2c_device: Box<dyn i2c::Device>,
 ) -> error::Result<Option<Box<dyn Sensor>>> {
     // Interesting SMBus registers
     const REG_MANUFACTURER_ID: u8 = 0xfe;
@@ -144,13 +144,13 @@ pub async fn probe_i2c_device(
 }
 
 /// Probe for known addresses for supported sensors
-pub async fn probe_i2c_sensors<T: 'static + i2c::AsyncBus + Clone>(
+pub async fn probe_i2c_sensors<T: 'static + i2c::Bus + Clone>(
     i2c_bus: T,
 ) -> error::Result<Option<Box<dyn Sensor>>> {
     // Go through all known addresses
     for address in SENSOR_I2C_ADDRESS.iter() {
         // Construct device at given i2c address
-        let i2c_device = Box::new(i2c::Device::new(i2c_bus.clone(), *address));
+        let i2c_device = Box::new(i2c::DeviceOnBus::new(i2c_bus.clone(), *address));
 
         // Try to probe this device
         match probe_i2c_device(i2c_device).await? {

@@ -22,7 +22,7 @@ use async_trait::async_trait;
 
 use crate::bm1387::{self, ChipAddress, Register};
 use crate::command::Interface as CommandInterface;
-use crate::i2c;
+use ii_async_i2c as i2c;
 
 use crate::error::{self, ErrorKind};
 use failure::ResultExt;
@@ -119,8 +119,8 @@ impl<T: CommandInterface> Bus<T> {
 
 /// I2C bus interface implementation
 #[async_trait]
-impl<T: CommandInterface> i2c::AsyncBus for Bus<T> {
-    async fn write(&mut self, i2c_address: i2c::Address, reg: u8, data: u8) -> error::Result<()> {
+impl<T: CommandInterface> i2c::Bus for Bus<T> {
+    async fn write(&mut self, i2c_address: i2c::Address, reg: u8, data: u8) -> i2c::Result<()> {
         let i2c_reg = bm1387::I2cControlReg {
             flags: bm1387::I2cControlFlags {
                 do_command: true,
@@ -138,7 +138,7 @@ impl<T: CommandInterface> i2c::AsyncBus for Bus<T> {
         Ok(())
     }
 
-    async fn read(&mut self, i2c_address: i2c::Address, reg: u8) -> error::Result<u8> {
+    async fn read(&mut self, i2c_address: i2c::Address, reg: u8) -> i2c::Result<u8> {
         let cmd_request = bm1387::I2cControlReg {
             flags: bm1387::I2cControlFlags {
                 do_command: true,
@@ -163,9 +163,7 @@ impl<T: CommandInterface> i2c::AsyncBus for Bus<T> {
             }
             delay_for(Bus::<T>::FAIL_TRY_DELAY).await;
         }
-        Err(ErrorKind::I2cHashchip(
-            "Hashchip I2C controller keeps reading wrong address/register".to_string(),
-        ))?
+        Err("Hashchip I2C controller keeps reading wrong address/register")?
     }
 }
 
@@ -173,7 +171,7 @@ impl<T: CommandInterface> i2c::AsyncBus for Bus<T> {
 mod test {
     use super::*;
     use bm1387::{I2cControlReg, MiscCtrlReg};
-    use i2c::AsyncBus;
+    use i2c::Bus as I2cBus;
     use std::sync::Arc;
 
     use futures::lock::Mutex;

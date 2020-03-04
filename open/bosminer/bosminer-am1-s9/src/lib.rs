@@ -32,7 +32,6 @@ pub mod fan;
 pub mod gpio;
 pub mod halt;
 pub mod hooks;
-pub mod i2c;
 pub mod io;
 pub mod monitor;
 pub mod null_work;
