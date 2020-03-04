@@ -294,6 +294,7 @@ dependencies = [
  "ii-fpga-io-am1-s9 0.1.0",
  "ii-linux-async-i2c 0.1.0",
  "ii-logging 0.1.0",
+ "ii-sensors 0.1.0",
  "inventory 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "linux-embedded-hal 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -978,6 +979,19 @@ dependencies = [
  "slog-async 2.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "slog-envlogger 2.2.0",
  "slog-term 2.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "ii-sensors"
+version = "0.1.0"
+dependencies = [
+ "async-trait 0.1.24 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ii-async-compat 0.2.0",
+ "ii-async-i2c 0.1.0",
+ "ii-logging 0.1.0",
+ "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "packed_struct 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "packed_struct_codegen 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

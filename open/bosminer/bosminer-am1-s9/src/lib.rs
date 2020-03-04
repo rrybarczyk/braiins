@@ -36,13 +36,14 @@ pub mod monitor;
 pub mod null_work;
 pub mod power;
 pub mod registry;
-pub mod sensor;
 pub mod utils;
 
 #[cfg(test)]
 pub mod test;
 
 use ii_logging::macros::*;
+
+use ii_sensors as sensor;
 
 use bosminer::async_trait;
 use bosminer::hal::{self, BackendConfig as _};
@@ -743,6 +744,7 @@ impl HashChain {
         // try to probe sensor
         let sensor = sensor::probe_i2c_sensors(i2c_bus)
             .await
+            .map_err(|e| error::Error::from(e))
             .with_context(|_| ErrorKind::Sensors("error when probing sensors".into()))?;
 
         // did we find anything?
@@ -755,6 +757,7 @@ impl HashChain {
         sensor
             .init()
             .await
+            .map_err(|e| error::Error::from(e))
             .with_context(|_| ErrorKind::Sensors("failed to initialize sensors".into()))?;
 
         // done
@@ -806,6 +809,7 @@ impl HashChain {
                 match sensor
                     .read_temperature()
                     .await
+                    .map_err(|e| error::Error::from(e))
                     .with_context(|_| {
                         ErrorKind::Hashboard(self.hashboard_idx, "temperature read fail".into())
                     })
