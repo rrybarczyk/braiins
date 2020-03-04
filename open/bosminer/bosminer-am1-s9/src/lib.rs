@@ -21,7 +21,6 @@
 // contact us at opensource@braiins.com.
 #![recursion_limit = "256"]
 
-mod async_i2c;
 pub mod bm1387;
 mod cgminer;
 pub mod command;

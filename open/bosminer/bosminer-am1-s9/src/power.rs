@@ -29,9 +29,9 @@ use std::convert::TryInto;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::async_i2c::AsyncI2cDev;
 use crate::error::{self, ErrorKind};
 use crate::halt;
+use ii_linux_async_i2c::AsyncI2cDev;
 
 use futures::lock::Mutex;
 use ii_async_compat::futures;
@@ -196,7 +196,8 @@ impl I2cBackend {
             let ret = self
                 .inner
                 .write(Self::get_i2c_address(hashboard_idx), vec![data])
-                .await;
+                .await
+                .map_err(|e| e.into());
             if ret.is_ok() {
                 return ret;
             }
