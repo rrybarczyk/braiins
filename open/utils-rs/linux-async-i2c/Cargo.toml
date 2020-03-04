@@ -9,3 +9,11 @@ edition = "2018"
 async-trait = "0.1.24"
 ii-async-compat = { path = "../../utils-rs/async-compat" }
 ii-async-i2c = { path = "../../utils-rs/async-i2c" }
+ii-logging = { path = "../../utils-rs/logging" }
+linux-embedded-hal = { version = "0.2.0" }
+
+[dependencies.embedded-hal]
+version = "0.2.0"
+# Temporary for InputPin and OutputPin traits
+features = ["unproven"]
+

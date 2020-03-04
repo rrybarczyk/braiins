@@ -35,24 +35,24 @@ use tokio::task;
 use embedded_hal::blocking::i2c::{Read, Write};
 use linux_embedded_hal::I2cdev;
 
-use crate::error::{self, ErrorKind};
-use failure::ResultExt;
-
 use std::convert::AsRef;
 use std::path::Path;
+
+/// Just use strings here
+type Result<T> = std::result::Result<T, String>;
 
 enum Request {
     Read {
         address: u8,
         num_bytes: usize,
         /// Channel used to send back result
-        reply: oneshot::Sender<error::Result<Vec<u8>>>,
+        reply: oneshot::Sender<Result<Vec<u8>>>,
     },
     Write {
         address: u8,
         bytes: Vec<u8>,
         /// Channel used to send back result
-        reply: oneshot::Sender<error::Result<()>>,
+        reply: oneshot::Sender<Result<()>>,
     },
 }
 
@@ -62,7 +62,7 @@ enum Request {
 fn serve_requests(
     mut i2c_device: I2cdev,
     mut request_rx: mpsc::UnboundedReceiver<Request>,
-) -> error::Result<()> {
+) -> Result<()> {
     while let Some(request) = block_on(request_rx.next()) {
         match request {
             Request::Read {
@@ -73,9 +73,8 @@ fn serve_requests(
                 let mut bytes = vec![0; num_bytes];
                 let result = i2c_device
                     .read(address, &mut bytes)
-                    .with_context(|e| ErrorKind::I2c(e.to_string()))
                     .map(|_| bytes)
-                    .map_err(|e| e.into());
+                    .map_err(|e| format!("async_linux_i2c: read: {}", e));
                 if reply.send(result).is_err() {
                     warn!("AsyncI2c reply send failed - remote side may have ended");
                 }
@@ -87,8 +86,7 @@ fn serve_requests(
             } => {
                 let result = i2c_device
                     .write(address, &bytes)
-                    .with_context(|e| ErrorKind::I2c(e.to_string()))
-                    .map_err(|e| e.into());
+                    .map_err(|e| format!("async_linux_i2c: write: {}", e));
                 if reply.send(result).is_err() {
                     warn!("AsyncI2c reply send failed - remote side may have ended");
                 }
@@ -111,8 +109,8 @@ impl AsyncI2cDev {
     /// Open I2C device
     /// Although this function is not async, it has to be called from within Tokio context
     /// because it spawns task in a separate thread that serves the (blocking) I2C requests.
-    pub fn open<P: AsRef<Path>>(path: P) -> error::Result<Self> {
-        let i2c_device = I2cdev::new(path).with_context(|e| ErrorKind::I2c(e.to_string()))?;
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let i2c_device = I2cdev::new(path).map_err(|e| format!("async_linux_i2c: open: {}", e))?;
         let (request_tx, request_rx) = mpsc::unbounded();
 
         // Spawn the future in a separate blocking pool (for blocking operations)
@@ -126,7 +124,7 @@ impl AsyncI2cDev {
         Ok(Self { request_tx })
     }
 
-    pub async fn read(&self, address: u8, num_bytes: usize) -> error::Result<Vec<u8>> {
+    pub async fn read(&self, address: u8, num_bytes: usize) -> Result<Vec<u8>> {
         let (reply_tx, reply_rx) = oneshot::channel();
         let request = Request::Read {
             address,
@@ -139,7 +137,7 @@ impl AsyncI2cDev {
         reply_rx.await.expect("failed to receive I2C reply")
     }
 
-    pub async fn write(&self, address: u8, bytes: Vec<u8>) -> error::Result<()> {
+    pub async fn write(&self, address: u8, bytes: Vec<u8>) -> Result<()> {
         let (reply_tx, reply_rx) = oneshot::channel();
         let request = Request::Write {
             address,
