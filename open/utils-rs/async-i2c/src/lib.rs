@@ -25,14 +25,29 @@
 pub mod test_utils;
 
 use async_trait::async_trait;
-use std::fmt;
+use std::fmt::{self, Display};
 use std::sync::Arc;
 
 use futures::lock::Mutex;
 use ii_async_compat::futures;
 
 /// Local error definition
-enum Error {}
+#[derive(Debug)]
+pub enum Error {
+    FailedReadBack(u8, u8, u8),
+    TestInvalidAddress(Address),
+    TestInaccessibleRegister(Address, u8),
+    General(String),
+}
+
+impl<E: Display> From<E> for Error {
+    fn from(e: E) -> Self {
+        Error::General(e.to_string())
+    }
+}
+
+/// Convenience type alias
+pub type Result<T> = std::result::Result<T, Error>;
 
 /// Struct representing I2C address
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -54,7 +69,7 @@ impl Address {
     }
 }
 
-impl fmt::Display for Address {
+impl Display for Address {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:#02x}", self.to_readable_hw_addr())
     }
@@ -66,9 +81,9 @@ pub trait Bus
 where
     Self: Sync + Send,
 {
-    async fn read(&mut self, addr: Address, reg: u8) -> error::Result<u8>;
+    async fn read(&mut self, addr: Address, reg: u8) -> Result<u8>;
 
-    async fn write(&mut self, addr: Address, reg: u8, val: u8) -> error::Result<()>;
+    async fn write(&mut self, addr: Address, reg: u8, val: u8) -> Result<()>;
 }
 
 /// `Device` represents (async) ops on a device on I2C bus
@@ -78,17 +93,17 @@ where
     Self: Sync + Send,
 {
     /// Read register
-    async fn read(&mut self, reg: u8) -> error::Result<u8>;
+    async fn read(&mut self, reg: u8) -> Result<u8>;
 
     /// Write register
-    async fn write(&mut self, reg: u8, val: u8) -> error::Result<()>;
+    async fn write(&mut self, reg: u8, val: u8) -> Result<()>;
 
     /// Write register and immediately read it back to check it was written correctly.
     /// * `reg` - address of register to write
     /// * `reg_read_back` - address of register to read! because it often is that those
     ///   two are different
     /// * `val` - value to write to the register
-    async fn write_readback(&mut self, reg: u8, reg_read_back: u8, val: u8) -> error::Result<()>;
+    async fn write_readback(&mut self, reg: u8, reg_read_back: u8, val: u8) -> Result<()>;
 
     /// Return I2C address of device
     fn get_address(&self) -> Address;
@@ -114,11 +129,11 @@ impl<T> Device for DeviceOnBus<T>
 where
     T: Clone + Bus,
 {
-    async fn read(&mut self, reg: u8) -> error::Result<u8> {
+    async fn read(&mut self, reg: u8) -> Result<u8> {
         self.bus.read(self.address, reg).await
     }
 
-    async fn write(&mut self, reg: u8, val: u8) -> error::Result<()> {
+    async fn write(&mut self, reg: u8, val: u8) -> Result<()> {
         self.bus.write(self.address, reg, val).await
     }
 
@@ -131,14 +146,11 @@ where
     /// TODO: Maybe make this function a default implementation for `Device` trait -
     /// it doesn't currently work because of https://github.com/rust-lang/rust/issues/51443
     /// which is due to `async-trait` conversion.
-    async fn write_readback(&mut self, reg: u8, reg_read_back: u8, val: u8) -> error::Result<()> {
+    async fn write_readback(&mut self, reg: u8, reg_read_back: u8, val: u8) -> Result<()> {
         self.write(reg, val).await?;
         let new_val = self.read(reg_read_back).await?;
         if val != new_val {
-            Err(ErrorKind::I2cHashchip(format!(
-                "failed to read back register {:#x}/{:#x}: written {:#x} but read back {:#x}",
-                reg, reg_read_back, val, new_val
-            )))?
+            Err(Error::FailedReadBack(reg, val, new_val))?
         }
         Ok(())
     }
@@ -166,12 +178,12 @@ impl<T> Bus for SharedBus<T>
 where
     T: Bus,
 {
-    async fn read(&mut self, addr: Address, reg: u8) -> error::Result<u8> {
+    async fn read(&mut self, addr: Address, reg: u8) -> Result<u8> {
         let mut bus = self.inner.lock().await;
         bus.read(addr, reg).await
     }
 
-    async fn write(&mut self, addr: Address, reg: u8, val: u8) -> error::Result<()> {
+    async fn write(&mut self, addr: Address, reg: u8, val: u8) -> Result<()> {
         let mut bus = self.inner.lock().await;
         bus.write(addr, reg, val).await
     }

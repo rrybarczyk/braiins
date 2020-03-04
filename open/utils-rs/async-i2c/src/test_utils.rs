@@ -20,9 +20,7 @@
 // of such proprietary license or if you have any other questions, please
 // contact us at opensource@braiins.com.
 
-use crate::i2c::{Address, Bus};
-
-use async_trait::async_trait;
+use super::*;
 
 /// Register, Value
 pub struct InitReg(pub u8, pub u8);
@@ -69,31 +67,25 @@ impl Bus for FakeI2cBus {
     /// Read register from device on I2C bus
     /// if `addr` doesn't match `respond_addr`, return default read byte or error
     /// if `reg` isn't enabled on device, return error
-    async fn read(&mut self, addr: Address, reg: u8) -> error::Result<u8> {
+    async fn read(&mut self, addr: Address, reg: u8) -> Result<u8> {
         if addr != self.respond_addr {
             if let Some(val) = self.other_addr_response {
                 return Ok(val);
             } else {
-                Err(ErrorKind::I2c(format!(
-                    "Nothing present on I2C address {}!",
-                    addr
-                )))?
+                Err(Error::TestInvalidAddress(addr))?
             }
         } else {
             let reg = reg as usize;
             if let Some(val) = self.data[reg] {
                 Ok(val)
             } else {
-                Err(ErrorKind::I2c(format!(
-                    "Register {:#x} is not accessible!",
-                    reg
-                )))?
+                Err(Error::TestInaccessibleRegister(addr, reg as u8))?
             }
         }
     }
 
     /// Write register to device on I2C bus
-    async fn write(&mut self, addr: Address, reg: u8, val: u8) -> error::Result<()> {
+    async fn write(&mut self, addr: Address, reg: u8, val: u8) -> Result<()> {
         // Try read the register first - if it's not accessible, this will create the error
         self.read(addr, reg).await?;
 
