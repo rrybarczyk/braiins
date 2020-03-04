@@ -22,8 +22,8 @@
 
 //! Driver implementation of sensor driver for TMP42x and similar sensors
 
-use crate::error;
-use crate::sensor::{self, Measurement, Temperature};
+use super::Result;
+use super::{Measurement, Sensor, Temperature};
 use ii_async_i2c as i2c;
 
 use packed_struct::prelude::*;
@@ -87,17 +87,14 @@ pub struct TMP42x {
 }
 
 impl TMP42x {
-    pub fn new(
-        i2c_device: Box<dyn i2c::Device>,
-        num_remote_sensors: usize,
-    ) -> Box<dyn sensor::Sensor> {
+    pub fn new(i2c_device: Box<dyn i2c::Device>, num_remote_sensors: usize) -> Box<dyn Sensor> {
         // TODO: If you are fixing this, you need to figure out sensor topology on hashboard
         assert_eq!(num_remote_sensors, 1);
         Box::new(Self {
             i2c_device,
             num_remote_sensors,
             discard_readings: None,
-        }) as Box<dyn sensor::Sensor>
+        }) as Box<dyn Sensor>
     }
 
     /// Read temperature from one sensor, `index` determines which one:
@@ -106,7 +103,7 @@ impl TMP42x {
     ///
     /// Each sensor is represented by a pair of registers containing high-byte/low-byte of the
     /// temperature.
-    pub async fn read_one_sensor(&mut self, index: usize) -> error::Result<Measurement> {
+    pub async fn read_one_sensor(&mut self, index: usize) -> Result<Measurement> {
         assert!(index <= 3);
         let high = self
             .i2c_device
@@ -134,9 +131,9 @@ impl TMP42x {
 }
 
 #[async_trait]
-impl sensor::Sensor for TMP42x {
+impl Sensor for TMP42x {
     /// Initialize temperature sensor - enable ext. range and all sensors
-    async fn init(&mut self) -> error::Result<()> {
+    async fn init(&mut self) -> Result<()> {
         // Eh, when setting the `RANGE` bit to 1, the change in temperature register format
         // isn't reflected until after the next ADC conversion finishes!
         // Let's remember the initial temperature and discard all temperature readings until
@@ -170,7 +167,7 @@ impl sensor::Sensor for TMP42x {
     }
 
     /// Do a temperature reading from all supported sensors
-    async fn read_temperature(&mut self) -> error::Result<Temperature> {
+    async fn read_temperature(&mut self) -> Result<Temperature> {
         // Mechanism to invalidate readings until "extended mode" is reflected in temp register
         match self.discard_readings {
             Some(bad_value) => {

@@ -39,7 +39,6 @@
 mod tmp42x;
 mod tmp451;
 
-use crate::error;
 use ii_async_i2c as i2c;
 
 use async_trait::async_trait;
@@ -47,14 +46,28 @@ use ii_logging::macros::*;
 use lazy_static::lazy_static;
 use std::boxed::Box;
 
+/// Each crate has to have its own error
+#[derive(Debug)]
+pub enum Error {
+    I2cError(i2c::Error),
+}
+
+impl From<i2c::Error> for Error {
+    fn from(e: i2c::Error) -> Self {
+        Self::I2cError(e)
+    }
+}
+
+pub type Result<T> = std::result::Result<T, Error>;
+
 /// Generic sensor
 #[async_trait]
 pub trait Sensor: Sync + Send {
     /// Initialize the sensor (should be called at least once before first call to `read_temperature`
-    async fn init(&mut self) -> error::Result<()>;
+    async fn init(&mut self) -> Result<()>;
 
     /// Read temperature from sensor
-    async fn read_temperature(&mut self) -> error::Result<Temperature>;
+    async fn read_temperature(&mut self) -> Result<Temperature>;
 }
 
 /// Result of measuring temperature with remote sensor
@@ -113,7 +126,7 @@ pub const INVALID_TEMPERATURE_READING: Temperature = Temperature {
 /// changes to the "probe API" with each new sensor.
 pub async fn probe_i2c_device(
     mut i2c_device: Box<dyn i2c::Device>,
-) -> error::Result<Option<Box<dyn Sensor>>> {
+) -> Result<Option<Box<dyn Sensor>>> {
     // Interesting SMBus registers
     const REG_MANUFACTURER_ID: u8 = 0xfe;
     const REG_DEVICE_ID: u8 = 0xff;
@@ -146,7 +159,7 @@ pub async fn probe_i2c_device(
 /// Probe for known addresses for supported sensors
 pub async fn probe_i2c_sensors<T: 'static + i2c::Bus + Clone>(
     i2c_bus: T,
-) -> error::Result<Option<Box<dyn Sensor>>> {
+) -> Result<Option<Box<dyn Sensor>>> {
     // Go through all known addresses
     for address in SENSOR_I2C_ADDRESS.iter() {
         // Construct device at given i2c address

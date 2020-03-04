@@ -22,8 +22,8 @@
 
 //! Driver implementation of sensor driver for TMP451 and similar sensors
 
-use crate::error;
-use crate::sensor::{self, Measurement, Temperature};
+use super::Result;
+use super::{Measurement, Sensor, Temperature};
 use ii_async_i2c as i2c;
 
 use async_trait::async_trait;
@@ -55,7 +55,7 @@ fn make_temp(whole: u8, fract: u8) -> f32 {
 async fn read_temperature(
     i2c_dev: &mut Box<dyn i2c::Device>,
     use_fract: bool,
-) -> error::Result<Temperature> {
+) -> Result<Temperature> {
     let status = i2c_dev.read(REG_STATUS).await?;
     let local_temp = i2c_dev.read(REG_LOCAL_TEMP).await?;
     let local_frac = if use_fract {
@@ -84,7 +84,7 @@ async fn read_temperature(
 }
 
 /// Read only local temperature
-async fn read_temperature_local(i2c_dev: &mut Box<dyn i2c::Device>) -> error::Result<Temperature> {
+async fn read_temperature_local(i2c_dev: &mut Box<dyn i2c::Device>) -> Result<Temperature> {
     let local_temp = i2c_dev.read(REG_LOCAL_TEMP).await?;
 
     Ok(Temperature {
@@ -93,7 +93,7 @@ async fn read_temperature_local(i2c_dev: &mut Box<dyn i2c::Device>) -> error::Re
     })
 }
 
-async fn generic_init(i2c_dev: &mut Box<dyn i2c::Device>) -> error::Result<()> {
+async fn generic_init(i2c_dev: &mut Box<dyn i2c::Device>) -> Result<()> {
     i2c_dev
         .write_readback(REG_CONFIG_W, REG_CONFIG, CONFIG_RANGE)
         .await?;
@@ -107,18 +107,18 @@ pub struct TMP451 {
 }
 
 impl TMP451 {
-    pub fn new(i2c_dev: Box<dyn i2c::Device>) -> Box<dyn sensor::Sensor> {
-        Box::new(Self { i2c_dev }) as Box<dyn sensor::Sensor>
+    pub fn new(i2c_dev: Box<dyn i2c::Device>) -> Box<dyn Sensor> {
+        Box::new(Self { i2c_dev }) as Box<dyn Sensor>
     }
 }
 
 #[async_trait]
-impl sensor::Sensor for TMP451 {
-    async fn init(&mut self) -> error::Result<()> {
+impl Sensor for TMP451 {
+    async fn init(&mut self) -> Result<()> {
         generic_init(&mut self.i2c_dev).await
     }
 
-    async fn read_temperature(&mut self) -> error::Result<Temperature> {
+    async fn read_temperature(&mut self) -> Result<Temperature> {
         read_temperature(&mut self.i2c_dev, true).await
     }
 }
@@ -129,18 +129,18 @@ pub struct ADT7461 {
 }
 
 impl ADT7461 {
-    pub fn new(i2c_dev: Box<dyn i2c::Device>) -> Box<dyn sensor::Sensor> {
-        Box::new(Self { i2c_dev }) as Box<dyn sensor::Sensor>
+    pub fn new(i2c_dev: Box<dyn i2c::Device>) -> Box<dyn Sensor> {
+        Box::new(Self { i2c_dev }) as Box<dyn Sensor>
     }
 }
 
 #[async_trait]
-impl sensor::Sensor for ADT7461 {
-    async fn init(&mut self) -> error::Result<()> {
+impl Sensor for ADT7461 {
+    async fn init(&mut self) -> Result<()> {
         generic_init(&mut self.i2c_dev).await
     }
 
-    async fn read_temperature(&mut self) -> error::Result<Temperature> {
+    async fn read_temperature(&mut self) -> Result<Temperature> {
         read_temperature(&mut self.i2c_dev, false).await
     }
 }
@@ -151,18 +151,18 @@ pub struct NCT218 {
 }
 
 impl NCT218 {
-    pub fn new(i2c_dev: Box<dyn i2c::Device>) -> Box<dyn sensor::Sensor> {
-        Box::new(Self { i2c_dev }) as Box<dyn sensor::Sensor>
+    pub fn new(i2c_dev: Box<dyn i2c::Device>) -> Box<dyn Sensor> {
+        Box::new(Self { i2c_dev }) as Box<dyn Sensor>
     }
 }
 
 #[async_trait]
-impl sensor::Sensor for NCT218 {
-    async fn init(&mut self) -> error::Result<()> {
+impl Sensor for NCT218 {
+    async fn init(&mut self) -> Result<()> {
         generic_init(&mut self.i2c_dev).await
     }
 
-    async fn read_temperature(&mut self) -> error::Result<Temperature> {
+    async fn read_temperature(&mut self) -> Result<Temperature> {
         read_temperature_local(&mut self.i2c_dev).await
     }
 }
