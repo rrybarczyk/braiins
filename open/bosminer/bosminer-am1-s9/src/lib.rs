@@ -71,9 +71,6 @@ use command::Interface;
 
 use packed_struct::PackedStruct;
 
-use embedded_hal::digital::v2::InputPin;
-use embedded_hal::digital::v2::OutputPin;
-
 use ii_bitcoin::MeetsTarget;
 
 use ii_async_compat::tokio;
