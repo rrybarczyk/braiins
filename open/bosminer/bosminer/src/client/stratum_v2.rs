@@ -48,6 +48,7 @@ use ii_async_compat::select;
 
 use std::collections::VecDeque;
 use std::fmt;
+use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Mutex as StdMutex;
 use std::sync::{Arc, Weak};
@@ -63,6 +64,7 @@ use ii_stratum::v2::types::*;
 use ii_stratum::v2::{
     self,
     framing::{Framing, Header},
+    DynFramedSink, DynFramedStream,
 };
 use ii_stratum::v2::{build_message_from_frame, extensions, Handler};
 
@@ -362,60 +364,14 @@ impl Handler for StratumEventHandler {
     }
 }
 
-trait FrameSink:
-    Sink<<Framing as ii_wire::Framing>::Tx, Error = <Framing as ii_wire::Framing>::Error>
-    + std::marker::Unpin
-    + std::fmt::Debug
-    + 'static
-{
-}
-
-impl<T> FrameSink for T where
-    T: Sink<<Framing as ii_wire::Framing>::Tx, Error = <Framing as ii_wire::Framing>::Error>
-        + std::marker::Unpin
-        + std::fmt::Debug
-        + 'static
-{
-}
-
-trait FrameStream:
-    Stream<
-        Item = std::result::Result<
-            <Framing as ii_wire::Framing>::Tx,
-            <Framing as ii_wire::Framing>::Error,
-        >,
-    > + std::marker::Unpin
-    + 'static
-{
-}
-
-impl<T> FrameStream for T where
-    T: Stream<
-            Item = std::result::Result<
-                <Framing as ii_wire::Framing>::Tx,
-                <Framing as ii_wire::Framing>::Error,
-            >,
-        > + std::marker::Unpin
-        + 'static
-{
-}
-
-struct StratumSolutionHandler<S> {
+struct StratumSolutionHandler {
     client: Arc<StratumClient>,
-    connection_tx: Arc<Mutex<S>>,
+    connection_tx: Arc<Mutex<DynFramedSink>>,
     seq_num: u32,
 }
 
-impl<S, E> StratumSolutionHandler<S>
-where
-    E: Into<error::Error>,
-    // TODO use S: FrameSink once the trait is adjusted to deal with payload specific error
-    S: Sink<<Framing as ii_wire::Framing>::Tx, Error = E>
-        + std::marker::Unpin
-        + std::fmt::Debug
-        + 'static,
-{
-    fn new(client: Arc<StratumClient>, connection_tx: Arc<Mutex<S>>) -> Self {
+impl StratumSolutionHandler {
+    fn new(client: Arc<StratumClient>, connection_tx: Arc<Mutex<DynFramedSink>>) -> Self {
         Self {
             client,
             connection_tx,
@@ -467,15 +423,11 @@ impl StratumConnectionHandler {
         }
     }
 
-    async fn setup_mining_connection<R, S>(
+    async fn setup_mining_connection(
         &mut self,
-        connection_rx: &mut R,
-        connection_tx: Arc<Mutex<S>>,
-    ) -> error::Result<()>
-    where
-        R: FrameStream,
-        S: FrameSink,
-    {
+        connection_rx: &mut DynFramedStream,
+        connection_tx: Arc<Mutex<DynFramedSink>>,
+    ) -> error::Result<()> {
         let connection_details = self.client.connection_details();
         let setup_msg = SetupConnection {
             protocol: 0,
@@ -502,15 +454,11 @@ impl StratumConnectionHandler {
         ))
     }
 
-    async fn open_channel<R, S>(
+    async fn open_channel(
         &mut self,
-        connection_rx: &mut R,
-        connection_tx: Arc<Mutex<S>>,
-    ) -> error::Result<()>
-    where
-        R: FrameStream,
-        S: FrameSink,
-    {
+        connection_rx: &mut DynFramedStream,
+        connection_tx: Arc<Mutex<DynFramedSink>>,
+    ) -> error::Result<()> {
         let channel_msg = OpenStandardMiningChannel {
             req_id: 10, // TODO? come up with request ID sequencing
             user: self
@@ -541,7 +489,7 @@ impl StratumConnectionHandler {
             .unwrap_or(Err("Unexpected response for stratum open channel".into()))
     }
 
-    async fn connect(&self) -> error::Result<v2::Framed> {
+    async fn connect(&self) -> error::Result<(DynFramedSink, DynFramedStream)> {
         let connection_details = self.client.connection_details();
         let addr = ii_wire::Address::from_str(connection_details.get_host_and_port().as_str())?;
         let mut client = ii_wire::Client::new(addr);
@@ -550,6 +498,7 @@ impl StratumConnectionHandler {
 
         // TODO this will be replaced by a 'connector' that will be set when building stratum
         // client instance
+        // TODO rename to client_framed_connection
         let client_framed_stream = match connection_details.protocol {
             // V2 secure connector
             ClientProtocol::StratumV2(upstream_authority_public_key) => {
@@ -565,20 +514,16 @@ impl StratumConnectionHandler {
             // Anything else is considered a bug
             _ => panic!("BUG: client supports only stratum V2 protocols!"),
         };
-
-        Ok(client_framed_stream)
+        let (sink, stream) = client_framed_stream.split();
+        Ok((Pin::new(Box::new(sink)), stream.boxed()))
     }
 
     /// Starts mining session and provides the initial target negotiated by the upstream endpoint
-    async fn init_mining_session<R, S>(
+    async fn init_mining_session(
         mut self,
-        connection_rx: &mut R,
-        connection_tx: Arc<Mutex<S>>,
-    ) -> error::Result<ii_bitcoin::Target>
-    where
-        R: FrameStream,
-        S: FrameSink,
-    {
+        connection_rx: &mut DynFramedStream,
+        connection_tx: Arc<Mutex<DynFramedSink>>,
+    ) -> error::Result<ii_bitcoin::Target> {
         self.setup_mining_connection(connection_rx, connection_tx.clone())
             .await
             .context("Cannot setup stratum mining connection")?;
@@ -767,15 +712,9 @@ impl StratumClient {
     /// TODO: temporarily, this became an associated method so that we don't have to generalize
     ///  with type parameters the full StratumClient struct. Once this is done, we will use the
     ///  new internal field connection_tx
-    async fn send_msg<M, S, E>(connection_tx: &Arc<Mutex<S>>, message: M) -> error::Result<()>
+    async fn send_msg<M>(connection_tx: &Arc<Mutex<DynFramedSink>>, message: M) -> error::Result<()>
     where
         M: TryInto<<Framing as ii_wire::Framing>::Tx, Error = <Framing as ii_wire::Framing>::Error>,
-        E: Into<error::Error>,
-        // TODO use S: FrameSink once the trait is adjusted to deal with payload specific error
-        S: Sink<<Framing as ii_wire::Framing>::Tx, Error = E>
-            + std::marker::Unpin
-            + std::fmt::Debug
-            + 'static,
     {
         let frame = message.try_into()?;
         match connection_tx
@@ -825,16 +764,12 @@ impl StratumClient {
         Ok(())
     }
 
-    async fn main_loop<R, S>(
+    async fn main_loop(
         self: Arc<Self>,
-        mut connection_rx: R,
-        connection_tx: Arc<Mutex<S>>,
+        mut connection_rx: DynFramedStream,
+        connection_tx: Arc<Mutex<DynFramedSink>>,
         mut event_handler: StratumEventHandler,
-    ) -> error::Result<()>
-    where
-        R: FrameStream,
-        S: FrameSink,
-    {
+    ) -> error::Result<()> {
         let mut solution_receiver = self.solution_receiver.lock().await;
         let mut extension_channel_rx = self.extension_channel_receiver.lock().await;
         let mut solution_handler = StratumSolutionHandler::new(self.clone(), connection_tx.clone());
@@ -882,15 +817,12 @@ impl StratumClient {
         Ok(())
     }
 
-    async fn run_job_solver<R, S>(
+    async fn run_job_solver(
         self: Arc<Self>,
-        connection_rx: R,
-        connection_tx: Arc<Mutex<S>>,
+        connection_rx: DynFramedStream,
+        connection_tx: Arc<Mutex<DynFramedSink>>,
         init_target: ii_bitcoin::Target,
-    ) where
-        R: FrameStream,
-        S: FrameSink,
-    {
+    ) {
         let event_handler = StratumEventHandler::new(self.clone(), init_target);
         // TODO consider changing main_loop to accept Arc<Self> and build the solution_handler
         //  along with solution handler communication channels inside of the main_loop.
@@ -915,8 +847,7 @@ impl StratumClient {
             .await
             .map_err(|_| error::ErrorKind::General("Connection timeout".to_string()).into())
         {
-            Ok(Ok(framed_connection)) => {
-                let (framed_sink, mut framed_stream) = framed_connection.split();
+            Ok(Ok((framed_sink, mut framed_stream))) => {
                 let framed_sink = Arc::new(Mutex::new(framed_sink));
                 match connection_handler
                     .init_mining_session(&mut framed_stream, framed_sink.clone())
