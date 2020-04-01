@@ -236,7 +236,7 @@ impl I2cBackend {
         for _ in 0..length {
             let byte = self
                 .inner
-                .read(Self::get_i2c_address(hashboard_idx), length)
+                .read(Self::get_i2c_address(hashboard_idx), 1)
                 .await?;
             reply.push(byte[0]);
         }
