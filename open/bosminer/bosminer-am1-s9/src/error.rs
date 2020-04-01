@@ -29,7 +29,6 @@ use ii_async_i2c as i2c;
 use ii_sensors as sensor;
 use std::io;
 use sysfs_gpio;
-use uio_async;
 
 pub struct Error {
     inner: Context<ErrorKind>,
@@ -44,14 +43,6 @@ pub enum ErrorKind {
     /// Standard input/output error.
     #[fail(display = "IO: {}", _0)]
     Io(String),
-
-    /// Error tied to a particular UIO device
-    #[fail(display = "UIO device {}: {}", _0, _1)]
-    UioDevice(String, String),
-
-    /// Generic UIO error
-    #[fail(display = "UIO: {}", _0)]
-    Uio(String),
 
     /// Unexpected version of something.
     #[fail(display = "Unexpected {} version: {}, expected: {}", _0, _1, _2)]
@@ -72,10 +63,6 @@ pub enum ErrorKind {
     /// Error concerning I2C on hashchip.
     #[fail(display = "I2C hashchip: {}", _0)]
     I2cHashchip(String),
-
-    /// Work or command FIFO timeout.
-    #[fail(display = "FIFO: {}: {}", _0, _1)]
-    Fifo(Fifo, String),
 
     /// Baud rate errors.
     #[fail(display = "Baud rate: {}", _0)]
@@ -111,19 +98,13 @@ pub enum ErrorKind {
 
     /// Error related to bosminer-antminer crate
     #[fail(display = "Antminer error: {}", _0)]
-    Antminer(bosminer_antminer::error::ErrorKind),
+    Antminer(String),
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Fail)]
 pub enum HashChainManager {
     #[fail(display = "HashChain parameters not set")]
     ParamsNotSet,
-}
-
-#[derive(Clone, Eq, PartialEq, Debug, Fail)]
-pub enum Fifo {
-    #[fail(display = "timed out")]
-    TimedOut,
 }
 
 /// Implement Fail trait instead of use Derive to get more control over custom type.
@@ -204,15 +185,6 @@ impl From<io::Error> for Error {
     }
 }
 
-impl From<uio_async::UioError> for Error {
-    fn from(uio_error: uio_async::UioError) -> Self {
-        let msg = uio_error.to_string();
-        Self {
-            inner: uio_error.context(ErrorKind::Uio(msg)),
-        }
-    }
-}
-
 impl From<sysfs_gpio::Error> for Error {
     fn from(gpio_error: sysfs_gpio::Error) -> Self {
         let msg = gpio_error.to_string();
@@ -234,9 +206,9 @@ impl From<sensor::Error> for Error {
     }
 }
 
-impl From<bosminer_antminer::error::ErrorKind> for Error {
-    fn from(e: bosminer_antminer::error::ErrorKind) -> Self {
-        ErrorKind::Antminer(e).into()
+impl From<bosminer_antminer::error::Error> for Error {
+    fn from(e: bosminer_antminer::error::Error) -> Self {
+        ErrorKind::Antminer(format!("{:?}", e)).into()
     }
 }
 

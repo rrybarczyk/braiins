@@ -45,7 +45,7 @@ use std::time::{Duration, UNIX_EPOCH};
 use ii_async_compat::prelude::*;
 use tokio::time::delay_for;
 
-use bosminer_antminer::midstate_count::MidstateCount;
+use crate::MidstateCount;
 use ii_fpga_io_am1_s9::{
     self,
     common::{ctrl_reg::MIDSTATE_CNT_A, version::MINER_TYPE_A},

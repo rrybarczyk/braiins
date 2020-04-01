@@ -6,5 +6,12 @@ license = "GPL-3.0-or-later"
 edition = "2018"
 
 [dependencies]
+approx = "0.3.2"
+bosminer = { path = "../bosminer" }
+chrono = "0.4.9"
 failure = "0.1.5"
 ii-async-compat = { path = "../../utils-rs/async-compat" }
+ii-fpga-io-am1-s9 = { path = "../../hw/zynq-io-am1-s9/fpga-io" }
+ii-logging = { path = "../../utils-rs/logging" }
+pid_control = "0.7.2"
+uio-async = { path = "../../utils-rs/uio-async" }

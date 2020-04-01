@@ -24,6 +24,7 @@
 
 use failure::{Backtrace, Context, Fail};
 use std::fmt::{self, Debug, Display};
+use std::io;
 
 pub struct Error {
     inner: Context<ErrorKind>,
@@ -39,9 +40,35 @@ pub enum ErrorKind {
     #[fail(display = "IO: {}", _0)]
     Io(String),
 
+    /// Error tied to a particular UIO device
+    #[fail(display = "UIO device {}: {}", _0, _1)]
+    UioDevice(String, String),
+
+    /// Generic UIO error
+    #[fail(display = "UIO: {}", _0)]
+    Uio(String),
+
+    /// Unexpected version of something.
+    #[fail(display = "Unexpected {} version: {}, expected: {}", _0, _1, _2)]
+    UnexpectedVersion(String, String, String),
+
+    /// Error concerning hashboard with specific index.
+    #[fail(display = "Hashboard {}: {}", _0, _1)]
+    Hashboard(usize, String),
+
+    /// Work or command FIFO timeout.
+    #[fail(display = "FIFO: {}: {}", _0, _1)]
+    Fifo(Fifo, String),
+
     /// Error when halting.
     #[fail(display = "Halt: {}", _0)]
     Halt(String),
+}
+
+#[derive(Clone, Eq, PartialEq, Debug, Fail)]
+pub enum Fifo {
+    #[fail(display = "timed out")]
+    TimedOut,
 }
 
 /// Implement Fail trait instead of use Derive to get more control over custom type.
@@ -101,6 +128,24 @@ impl From<Context<String>> for Error {
 impl From<String> for Error {
     fn from(msg: String) -> Self {
         ErrorKind::General(msg).into()
+    }
+}
+
+impl From<io::Error> for Error {
+    fn from(e: io::Error) -> Self {
+        let msg = e.to_string();
+        Self {
+            inner: e.context(ErrorKind::Io(msg)),
+        }
+    }
+}
+
+impl From<uio_async::UioError> for Error {
+    fn from(uio_error: uio_async::UioError) -> Self {
+        let msg = uio_error.to_string();
+        Self {
+            inner: uio_error.context(ErrorKind::Uio(msg)),
+        }
     }
 }
 

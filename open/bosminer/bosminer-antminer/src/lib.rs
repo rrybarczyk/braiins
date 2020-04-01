@@ -21,5 +21,9 @@
 // contact us at opensource@braiins.com.
 
 pub mod error;
+pub mod fan;
 pub mod halt;
+pub mod io;
 pub mod midstate_count;
+
+pub use midstate_count::MidstateCount;

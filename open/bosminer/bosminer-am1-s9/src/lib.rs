@@ -26,11 +26,9 @@ mod cgminer;
 pub mod command;
 pub mod config;
 pub mod error;
-pub mod fan;
 pub mod gpio;
 pub mod hashchain;
 pub mod hooks;
-pub mod io;
 pub mod monitor;
 pub mod null_work;
 pub mod power;
@@ -49,7 +47,10 @@ use bosminer::node;
 use bosminer::stats;
 use bosminer::work;
 
+use bosminer_antminer::fan;
+/// TODO: make this use non-pub and fix it in dependant crates
 pub use bosminer_antminer::halt;
+use bosminer_antminer::io;
 
 use bosminer_macros::WorkSolverNode;
 
