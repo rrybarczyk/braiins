@@ -314,12 +314,16 @@ name = "bosminer-antminer"
 version = "0.1.0"
 dependencies = [
  "approx 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "async-trait 0.1.24 (registry+https://github.com/rust-lang/crates.io-index)",
  "bosminer 0.1.0",
  "chrono 0.4.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.6",
  "ii-async-compat 0.2.0",
+ "ii-async-i2c 0.1.0",
  "ii-fpga-io-am1-s9 0.1.0",
  "ii-logging 0.1.0",
+ "packed_struct 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "packed_struct_codegen 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "pid_control 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "uio-async 0.1.0",
 ]

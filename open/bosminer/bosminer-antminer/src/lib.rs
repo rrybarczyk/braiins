@@ -20,6 +20,7 @@
 // of such proprietary license or if you have any other questions, please
 // contact us at opensource@braiins.com.
 
+pub mod bm1387;
 pub mod error;
 pub mod fan;
 pub mod halt;

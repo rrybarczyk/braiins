@@ -56,9 +56,25 @@ pub enum ErrorKind {
     #[fail(display = "Hashboard {}: {}", _0, _1)]
     Hashboard(usize, String),
 
+    /// Error concerning hashchip.
+    #[fail(display = "Hashchip: {}", _0)]
+    Hashchip(String),
+
+    /// Error concerning I2C on hashchip.
+    #[fail(display = "I2C hashchip: {}", _0)]
+    I2cHashchip(String),
+
+    /// Baud rate errors.
+    #[fail(display = "Baud rate: {}", _0)]
+    BaudRate(String),
+
     /// Work or command FIFO timeout.
     #[fail(display = "FIFO: {}: {}", _0, _1)]
     Fifo(Fifo, String),
+
+    /// PLL conversion error
+    #[fail(display = "PLL: {}", _0)]
+    PLL(String),
 
     /// Error when halting.
     #[fail(display = "Halt: {}", _0)]

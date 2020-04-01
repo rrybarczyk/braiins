@@ -20,6 +20,7 @@
 // of such proprietary license or if you have any other questions, please
 // contact us at opensource@braiins.com.
 
+pub mod command;
 pub mod i2c;
 
 use crate::error::{self, ErrorKind};
@@ -28,7 +29,7 @@ use packed_struct::prelude::*;
 use packed_struct_codegen::PackedStruct;
 use packed_struct_codegen::{PrimitiveEnum_u16, PrimitiveEnum_u8};
 
-pub use bosminer_antminer::midstate_count::MidstateCount;
+pub use crate::MidstateCount;
 
 use std::convert::TryInto;
 use std::default::Default;

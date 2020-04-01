@@ -52,17 +52,9 @@ pub enum ErrorKind {
     #[fail(display = "Hashboard {}: {}", _0, _1)]
     Hashboard(usize, String),
 
-    /// Error concerning hashchip.
-    #[fail(display = "Hashchip: {}", _0)]
-    Hashchip(String),
-
     /// Error concerning hashchip enumeration.
     #[fail(display = "Enumeration: {}", _0)]
     ChipEnumeration(String),
-
-    /// Error concerning I2C on hashchip.
-    #[fail(display = "I2C hashchip: {}", _0)]
-    I2cHashchip(String),
 
     /// Baud rate errors.
     #[fail(display = "Baud rate: {}", _0)]
@@ -79,10 +71,6 @@ pub enum ErrorKind {
     /// Power controller errors.
     #[fail(display = "Power: {}", _0)]
     Power(String),
-
-    /// PLL conversion error
-    #[fail(display = "PLL: {}", _0)]
-    PLL(String),
 
     /// Error from hashchain manager.
     #[fail(display = "HashChain Manager: {}", _0)]

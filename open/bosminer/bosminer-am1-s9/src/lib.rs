@@ -21,9 +21,7 @@
 // contact us at opensource@braiins.com.
 #![recursion_limit = "256"]
 
-pub mod bm1387;
 mod cgminer;
-pub mod command;
 pub mod config;
 pub mod error;
 pub mod gpio;
@@ -47,6 +45,8 @@ use bosminer::node;
 use bosminer::stats;
 use bosminer::work;
 
+use bosminer_antminer::bm1387;
+use bosminer_antminer::bm1387::command;
 use bosminer_antminer::fan;
 /// TODO: make this use non-pub and fix it in dependant crates
 pub use bosminer_antminer::halt;

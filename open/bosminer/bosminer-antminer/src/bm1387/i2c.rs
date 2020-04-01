@@ -20,8 +20,7 @@
 
 use async_trait::async_trait;
 
-use crate::bm1387::{self, ChipAddress, Register};
-use crate::command::Interface as CommandInterface;
+use crate::bm1387::{self, command::Interface as CommandInterface, ChipAddress, Register};
 use ii_async_i2c as i2c;
 
 use crate::error::{self, ErrorKind};
