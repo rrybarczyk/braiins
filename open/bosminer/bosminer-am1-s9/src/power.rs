@@ -47,7 +47,7 @@ pub static OPEN_CORE_VOLTAGE: Lazy<Voltage> =
 /// Voltage controller requires periodic heart beat messages to be sent
 const VOLTAGE_CTRL_HEART_BEAT_PERIOD: Duration = Duration::from_millis(1000);
 
-const PIC_BASE_ADDRESS: u8 = 0x50;
+const PIC_BASE_I2C_ADDRESS: u8 = 0x50;
 
 const PIC_COMMAND_1: u8 = 0x55;
 const PIC_COMMAND_2: u8 = 0xAA;
@@ -176,7 +176,7 @@ impl I2cBackend {
 
     /// Calculates I2C address of the controller based on hashboard index.
     fn get_i2c_address(hashboard_idx: usize) -> u8 {
-        PIC_BASE_ADDRESS + hashboard_idx as u8 - 1
+        PIC_BASE_I2C_ADDRESS + hashboard_idx as u8 - 1
     }
 
     /// Instantiates a new I2C backend
