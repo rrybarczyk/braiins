@@ -62,8 +62,6 @@ use futures::lock::{Mutex, MutexGuard};
 use futures::stream::StreamExt;
 use ii_async_compat::futures;
 
-use bm1387::MidstateCount;
-
 use ii_async_compat::tokio;
 use tokio::sync::watch;
 use tokio::time::delay_for;

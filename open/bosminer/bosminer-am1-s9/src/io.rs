@@ -32,7 +32,6 @@ mod ext_work_id;
 mod uio;
 
 use crate::error::{self, ErrorKind};
-use crate::MidstateCount;
 use ext_work_id::ExtWorkId;
 
 use bosminer::work;
@@ -46,7 +45,12 @@ use std::time::{Duration, UNIX_EPOCH};
 use ii_async_compat::prelude::*;
 use tokio::time::delay_for;
 
-use ii_fpga_io_am1_s9::{self, common::version::MINER_TYPE_A, generic::Variant};
+use bosminer_antminer::midstate_count::MidstateCount;
+use ii_fpga_io_am1_s9::{
+    self,
+    common::{ctrl_reg::MIDSTATE_CNT_A, version::MINER_TYPE_A},
+    generic::Variant,
+};
 
 use ii_logging::macros::*;
 
@@ -610,10 +614,13 @@ impl Common {
     /// (of course we shouldn't but who is the responsible for the translation?)
     /// Note: this function is not public because you ought to use `set_midstate_count`
     #[inline]
-    fn set_ip_core_midstate_count(
-        &self,
-        value: ii_fpga_io_am1_s9::common::ctrl_reg::MIDSTATE_CNT_A,
-    ) {
+    fn set_ip_core_midstate_count(&self, midstate_count: MidstateCount) {
+        let value = match midstate_count.to_bits() {
+            0 => MIDSTATE_CNT_A::ONE,
+            1 => MIDSTATE_CNT_A::TWO,
+            2 => MIDSTATE_CNT_A::FOUR,
+            _ => panic!("invalid midstate count logarithm"),
+        };
         self.regs
             .ctrl_reg
             .modify(|_, w| w.midstate_cnt().variant(value));
@@ -649,7 +656,7 @@ impl Common {
     }
 
     pub fn set_midstate_count(&self) {
-        self.set_ip_core_midstate_count(self.midstate_count.to_reg());
+        self.set_ip_core_midstate_count(self.midstate_count);
     }
 
     fn init(&mut self) -> error::Result<()> {

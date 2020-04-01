@@ -22,6 +22,8 @@
 
 pub mod work_generation;
 
+use bm1387::MidstateCount;
+
 use super::*;
 
 #[tokio::test]

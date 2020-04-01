@@ -22,3 +22,4 @@
 
 pub mod error;
 pub mod halt;
+pub mod midstate_count;
