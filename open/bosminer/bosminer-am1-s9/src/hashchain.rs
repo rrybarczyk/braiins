@@ -60,6 +60,8 @@ use crate::monitor;
 use crate::null_work;
 use crate::power;
 
+use once_cell::sync::Lazy;
+
 /// Import traits
 use command::Interface;
 use ii_bitcoin::MeetsTarget;
@@ -92,6 +94,10 @@ const CORE_ADR_SPACE_SIZE: usize = 128;
 
 /// Timeout for completion of haschain halt
 const HALT_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Pre-computed PLL for quick lookup
+pub static PRECOMPUTED_PLL: Lazy<bm1387::PllTable> =
+    Lazy::new(|| bm1387::PllTable::build(CHIP_OSC_CLK_HZ));
 
 /// Type representing plug pin
 #[derive(Clone)]
@@ -540,7 +546,7 @@ impl HashChain {
     /// WARNING: you have to take care of `set_work_time` yourself
     async fn set_chip_pll(&self, chip_addr: ChipAddress, freq: usize) -> error::Result<()> {
         // convert frequency to PLL setting register
-        let pll = bm1387::PllFrequency::lookup_freq(freq)?;
+        let pll = PRECOMPUTED_PLL.lookup(freq)?;
 
         info!(
             "chain {}: setting frequency {} MHz on {:?} (error {} MHz)",

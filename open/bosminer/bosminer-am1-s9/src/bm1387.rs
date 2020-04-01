@@ -28,8 +28,6 @@ use packed_struct::prelude::*;
 use packed_struct_codegen::PackedStruct;
 use packed_struct_codegen::{PrimitiveEnum_u16, PrimitiveEnum_u8};
 
-use once_cell::sync::Lazy;
-
 use ii_fpga_io_am1_s9::common::ctrl_reg::MIDSTATE_CNT_A;
 
 use std::convert::TryInto;
@@ -597,31 +595,9 @@ pub struct PllReg {
     postdiv2: u8,
 }
 
-impl PllReg {
-    /// Simulate divider/PLL and calculate target frequency
-    pub fn calc(&self, xtal_freq: usize) -> usize {
-        // we have to do the arithmetic in u64 (at least) to be sure
-        // there wouldn't be an overflow
-        (xtal_freq as u64 * self.fbdiv as u64
-            / self.refdiv as u64
-            / self.postdiv1 as u64
-            / self.postdiv2 as u64) as usize
-    }
-
-    /// Find error between target frequency and computed frequency
-    #[allow(dead_code)]
-    fn calculate_error(&self, xtal_freq: usize, target_freq: usize) -> usize {
-        (self.calc(xtal_freq) as i64 - target_freq as i64).abs() as usize
-    }
-}
-
 impl Register for PllReg {
     const REG_NUM: u8 = 0x0c;
 }
-
-// TODO: how to initialize with custom XTAL frequency?
-pub static PRECOMPUTED_PLL: Lazy<Vec<PllFrequency>> =
-    Lazy::new(|| PllFrequency::precompute_pll_table(crate::hashchain::CHIP_OSC_CLK_HZ));
 
 // compute distance between two usizes
 fn distance(x: usize, y: usize) -> usize {
@@ -641,18 +617,43 @@ pub struct PllFrequency {
 }
 
 impl PllFrequency {
+    /// Simulate divider/PLL and calculate target frequency
+    pub fn new(reg: PllReg, xtal_freq: usize) -> Self {
+        // we have to do the arithmetic in u64 (at least) to be sure
+        // there wouldn't be an overflow
+        let frequency = (xtal_freq as u64 * reg.fbdiv as u64
+            / reg.refdiv as u64
+            / reg.postdiv1 as u64
+            / reg.postdiv2 as u64) as usize;
+        // Clamp frequency to fit in usize range
+        let frequency =
+            frequency.min(std::usize::MAX.try_into().expect("BUG: u64 < usize")) as usize;
+
+        Self { frequency, reg }
+    }
+}
+
+/// Table with precomputed dividers
+pub struct PllTable {
+    /// Crystal frequency for which was this table computed
+    #[allow(dead_code)]
+    xtal_freq: usize,
+    table: Vec<PllFrequency>,
+}
+
+impl PllTable {
     /// Minimum and maximum supported frequency
     const MIN_FREQ_HZ: usize = 100_000_000;
     const MAX_FREQ_HZ: usize = 1_200_000_000;
     const BIN_SIZE_HZ: usize = 1_000_000;
 
     /// Precompute divider table (which sorted list of frequencies and corresponding dividers)
-    fn precompute_pll_table(xtal_freq: usize) -> Vec<Self> {
+    pub fn build(xtal_freq: usize) -> Self {
         let min_mhz = Self::MIN_FREQ_HZ / Self::BIN_SIZE_HZ;
         let max_mhz = Self::MAX_FREQ_HZ / Self::BIN_SIZE_HZ;
         // One bin for each MHz in the range [0; MAX_MHZ].
         // Each bin contains either nothing or the best approximation found so far.
-        let mut freq_bins: Vec<Option<Self>> = vec![None; max_mhz + 1];
+        let mut freq_bins: Vec<Option<PllFrequency>> = vec![None; max_mhz + 1];
 
         // Go through all dividers
         for postdiv1 in 1..=7 {
@@ -667,9 +668,9 @@ impl PllFrequency {
                             postdiv2,
                         };
                         // Calculate frequency set by this divider
-                        let frequency = reg.calc(xtal_freq);
+                        let pll_freq = PllFrequency::new(reg, xtal_freq);
                         // Round to nearest MHz to get bin number
-                        let bin_no = (frequency + 500_000) / Self::BIN_SIZE_HZ;
+                        let bin_no = pll_freq.frequency.saturating_add(500_000) / Self::BIN_SIZE_HZ;
                         if bin_no < min_mhz || bin_no > max_mhz {
                             // Frequency out of range
                             continue;
@@ -684,46 +685,48 @@ impl PllFrequency {
                         }) = bin.as_ref()
                         {
                             // There's already a PLL in this bucket
-                            if distance(bin_freq, *old_freq) <= distance(bin_freq, frequency) {
+                            if distance(bin_freq, *old_freq)
+                                <= distance(bin_freq, pll_freq.frequency)
+                            {
                                 // We are not improving the approximation, bail out
                                 continue;
                             }
                         }
 
                         // Remember this divider
-                        *bin = Some(PllFrequency { frequency, reg });
+                        *bin = Some(pll_freq);
                     }
                 }
             }
         }
 
         // Filter out all the bins that are empty and calculate frequency
-        let pll_table = freq_bins.drain(..).filter_map(|x| x).collect::<Vec<_>>();
+        let table = freq_bins.drain(..).filter_map(|x| x).collect::<Vec<_>>();
 
-        pll_table
+        Self { table, xtal_freq }
     }
 
-    /// Lookup best divider for a given frequency from a table of dividers
-    /// This table is built on-demand (via `once_cell::Lazy`)
-    pub fn lookup_freq(target_freq: usize) -> error::Result<PllFrequency> {
-        let plls = &PRECOMPUTED_PLL;
+    /// Lookup best divider from a precomputed table
+    pub fn lookup(&self, target_freq: usize) -> error::Result<PllFrequency> {
         // The table is sorted
-        let result = plls.binary_search_by_key(&target_freq, |p| p.frequency);
+        let result = self
+            .table
+            .binary_search_by_key(&target_freq, |p| p.frequency);
         match result {
-            Ok(i) => return Ok(plls[i].clone()),
+            Ok(i) => return Ok(self.table[i].clone()),
             Err(i) => {
-                if i == 0 || i >= plls.len() {
+                if i == 0 || i >= self.table.len() {
                     Err(ErrorKind::PLL(format!(
                         "Requested frequency {} out of range!",
                         target_freq
                     )))?
                 } else {
-                    if distance(plls[i - 1].frequency, target_freq)
-                        <= distance(plls[i].frequency, target_freq)
+                    if distance(self.table[i - 1].frequency, target_freq)
+                        <= distance(self.table[i].frequency, target_freq)
                     {
-                        Ok(plls[i - 1].clone())
+                        Ok(self.table[i - 1].clone())
                     } else {
-                        Ok(plls[i].clone())
+                        Ok(self.table[i].clone())
                     }
                 }
             }
@@ -980,16 +983,16 @@ mod test {
 
     /// Test serialization and evaluation of PLL divider
     fn try_one_divider(freq: usize, reg: u32, fbdiv: u8, refdiv: u8, postdiv1: u8, postdiv2: u8) {
-        let pll = PllReg {
+        let pll_reg = PllReg {
             fbdiv,
             refdiv,
             postdiv1,
             postdiv2,
         };
         let xin = DEFAULT_XTAL_FREQ;
-        assert_eq!(pll.calc(xin), freq);
-        assert_eq!(pll.calculate_error(xin, freq - 500), 500);
-        assert_eq!(pll.to_reg(), reg);
+        let pll_freq = PllFrequency::new(pll_reg.clone(), xin);
+        assert_eq!(pll_freq.frequency, freq);
+        assert_eq!(pll_reg.to_reg(), reg);
     }
 
     #[test]
@@ -1007,9 +1010,13 @@ mod test {
     }
 
     fn lookup_one(freq: usize) -> Option<usize> {
-        if let Ok(PllFrequency { frequency, reg }) = PllFrequency::lookup_freq(freq) {
+        let table = PllTable::build(DEFAULT_XTAL_FREQ);
+        if let Ok(PllFrequency { frequency, reg }) = table.lookup(freq) {
             // found frequency and PLL register have to match
-            assert_eq!(reg.calc(DEFAULT_XTAL_FREQ), frequency);
+            assert_eq!(
+                PllFrequency::new(reg, DEFAULT_XTAL_FREQ).frequency,
+                frequency
+            );
             Some(frequency)
         } else {
             None
