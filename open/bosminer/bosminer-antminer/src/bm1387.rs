@@ -290,6 +290,9 @@ pub struct I2cControlFlags {
     /// I2C controller is busy flag
     #[packed_field(bits = "7")]
     pub busy: bool,
+    /// Error flag, last transaction failed
+    #[packed_field(bits = "6")]
+    pub error: bool,
     /// Initiate I2C transaction flag
     #[packed_field(bits = "0")]
     pub do_command: bool,

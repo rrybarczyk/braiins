@@ -24,7 +24,7 @@
 
 use async_trait::async_trait;
 
-use crate::bm1387::{self, command::Interface as CommandInterface, ChipAddress, Register};
+use crate::bm1387::{self, command::Interface as CommandInterface, ChipAddress};
 use ii_async_i2c as i2c;
 
 use crate::error::{self, ErrorKind};
@@ -55,9 +55,9 @@ impl<T: CommandInterface> Bus<T> {
     const BUSY_WAIT_DELAY: Duration = Duration::from_millis(1);
     /// How many times to try again when I2C command fails (ie. the
     /// address register doesn't match up with what was requested etc.)
-    const MAX_I2C_FAIL_TRIES: usize = 3;
+    const MAX_I2C_FAIL_TRIES: usize = 5;
     /// Timeout between fails
-    const FAIL_TRY_DELAY: Duration = Duration::from_millis(50);
+    const FAIL_TRY_DELAY: Duration = Duration::from_millis(200);
 
     /// Make new I2C bus.
     /// We init the bus right away to prevent using non-initialized bus.
@@ -84,7 +84,7 @@ impl<T: CommandInterface> Bus<T> {
                 .read_one_register::<bm1387::I2cControlReg>(self.chip_address)
                 .await?;
             trace!("i2c busy: {:#x?}", reg);
-            if (reg.to_reg() & 0x8000_0000) == 0 {
+            if !reg.flags.busy {
                 // TODO: There was a check for register not being zero - why? (investigate)
                 // Should we somehow ensure that the register is not 0 by writing `do_cmd` flag to it?
                 // `&& reg.to_reg() != 0`
@@ -128,17 +128,29 @@ impl<T: CommandInterface> i2c::Bus for Bus<T> {
             flags: bm1387::I2cControlFlags {
                 do_command: true,
                 busy: false,
+                // TODO: Implement default
+                error: false,
             },
             addr: i2c_address.to_writable_hw_addr(),
             reg,
             data,
         };
-        self.wait_busy().await?;
-        self.command_context
-            .write_register(self.chip_address, &i2c_reg)
-            .await?;
-        self.wait_busy().await?;
-        Ok(())
+        for _ in 0..Self::MAX_I2C_FAIL_TRIES {
+            self.wait_busy().await?;
+            self.command_context
+                .write_register(self.chip_address, &i2c_reg)
+                .await?;
+            let cmd_reply = self.wait_busy().await?;
+            if cmd_reply.flags.error {
+                warn!("Hashchip I2C write transaction error! Retrying...");
+            } else {
+                return Ok(());
+            }
+            delay_for(Bus::<T>::FAIL_TRY_DELAY).await;
+        }
+        Err(ErrorKind::I2cHashchip(
+            "Hashchip I2C controller keeps getting error".to_string(),
+        ))?
     }
 
     async fn read(&mut self, i2c_address: i2c::Address, reg: u8) -> i2c::Result<u8> {
@@ -146,6 +158,8 @@ impl<T: CommandInterface> i2c::Bus for Bus<T> {
             flags: bm1387::I2cControlFlags {
                 do_command: true,
                 busy: false,
+                // TODO: Implement default
+                error: false,
             },
             addr: i2c_address.to_readable_hw_addr(),
             reg,
@@ -159,8 +173,10 @@ impl<T: CommandInterface> i2c::Bus for Bus<T> {
                 .await?;
             // wait for it to be done
             let cmd_reply = self.wait_busy().await?;
-            // check that reply has the same i2c address and  register
-            if cmd_reply.addr == cmd_request.addr && cmd_reply.reg == reg {
+            // check for error and that the reply has the same i2c address and  register
+            if cmd_reply.flags.error {
+                warn!("Hashchip I2C read transaction error! Retrying...");
+            } else if cmd_reply.addr == cmd_request.addr && cmd_reply.reg == reg {
                 // looks legit
                 return Ok(cmd_reply.data);
             }
@@ -172,6 +188,7 @@ impl<T: CommandInterface> i2c::Bus for Bus<T> {
     }
 }
 
+/// TODO: add test for frames with error condition
 #[cfg(test)]
 mod test {
     use super::*;

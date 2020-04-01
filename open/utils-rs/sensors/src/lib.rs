@@ -164,9 +164,9 @@ pub async fn probe_i2c_sensors<T: 'static + i2c::Bus + Clone>(
         let i2c_device = Box::new(i2c::DeviceOnBus::new(i2c_bus.clone(), *address));
 
         // Try to probe this device
-        match probe_i2c_device(i2c_device).await? {
+        match probe_i2c_device(i2c_device).await {
             // OK, there's one
-            sensor @ Some(_) => return Ok(sensor),
+            Ok(sensor @ Some(_)) => return Ok(sensor),
             _ => (),
         }
     }
