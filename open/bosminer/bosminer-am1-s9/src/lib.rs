@@ -28,7 +28,6 @@ pub mod config;
 pub mod error;
 pub mod fan;
 pub mod gpio;
-pub mod halt;
 pub mod hashchain;
 pub mod hooks;
 pub mod io;
@@ -49,6 +48,8 @@ use bosminer::hal::{self, BackendConfig as _};
 use bosminer::node;
 use bosminer::stats;
 use bosminer::work;
+
+pub use bosminer_antminer::halt;
 
 use bosminer_macros::WorkSolverNode;
 

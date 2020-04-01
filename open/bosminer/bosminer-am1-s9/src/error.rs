@@ -108,6 +108,10 @@ pub enum ErrorKind {
     /// Error when dealing with sensors.
     #[fail(display = "Sensors: {}", _0)]
     Sensors(String),
+
+    /// Error related to bosminer-antminer crate
+    #[fail(display = "Antminer error: {}", _0)]
+    Antminer(bosminer_antminer::error::ErrorKind),
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Fail)]
@@ -227,6 +231,12 @@ impl From<i2c::Error> for Error {
 impl From<sensor::Error> for Error {
     fn from(e: sensor::Error) -> Self {
         ErrorKind::Sensors(format!("{:?}", e)).into()
+    }
+}
+
+impl From<bosminer_antminer::error::ErrorKind> for Error {
+    fn from(e: bosminer_antminer::error::ErrorKind) -> Self {
+        ErrorKind::Antminer(e).into()
     }
 }
 

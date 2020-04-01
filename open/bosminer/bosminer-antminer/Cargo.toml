@@ -1,0 +1,10 @@
+[package]
+name = "bosminer-antminer"
+version = "0.1.0"
+authors = ["Braiins <braiins@braiins.com>"]
+license = "GPL-3.0-or-later"
+edition = "2018"
+
+[dependencies]
+failure = "0.1.5"
+ii-async-compat = { path = "../../utils-rs/async-compat" }

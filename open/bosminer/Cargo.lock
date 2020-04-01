@@ -282,6 +282,7 @@ dependencies = [
  "approx 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "async-trait 0.1.24 (registry+https://github.com/rust-lang/crates.io-index)",
  "bosminer 0.1.0",
+ "bosminer-antminer 0.1.0",
  "bosminer-config 0.1.0",
  "bosminer-macros 0.1.0",
  "chrono 0.4.9 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -308,6 +309,14 @@ dependencies = [
  "sysfs_gpio 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "toml 0.5.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "uio-async 0.1.0",
+]
+
+[[package]]
+name = "bosminer-antminer"
+version = "0.1.0"
+dependencies = [
+ "failure 0.1.6",
+ "ii-async-compat 0.2.0",
 ]
 
 [[package]]
