@@ -322,6 +322,7 @@ dependencies = [
  "ii-async-i2c 0.1.0",
  "ii-fpga-io-am1-s9 0.1.0",
  "ii-logging 0.1.0",
+ "ii-sensors 0.1.0",
  "packed_struct 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "packed_struct_codegen 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "pid_control 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",

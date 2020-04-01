@@ -27,7 +27,8 @@ use ii_logging::macros::*;
 
 use crate::fan;
 use crate::halt;
-use crate::sensor::{self, Measurement};
+
+use ii_sensors::{self as sensor, Measurement};
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};

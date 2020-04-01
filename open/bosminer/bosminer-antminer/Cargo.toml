@@ -15,6 +15,7 @@ ii-async-compat = { path = "../../utils-rs/async-compat" }
 ii-async-i2c = { path = "../../utils-rs/async-i2c" }
 ii-fpga-io-am1-s9 = { path = "../../hw/zynq-io-am1-s9/fpga-io" }
 ii-logging = { path = "../../utils-rs/logging" }
+ii-sensors = { path = "../../utils-rs/sensors" }
 packed_struct="0.3"
 packed_struct_codegen = "0.3"
 pid_control = "0.7.2"

@@ -27,7 +27,6 @@ pub mod error;
 pub mod gpio;
 pub mod hashchain;
 pub mod hooks;
-pub mod monitor;
 pub mod null_work;
 pub mod power;
 pub mod utils;
@@ -51,6 +50,7 @@ use bosminer_antminer::fan;
 /// TODO: make this use non-pub and fix it in dependant crates
 pub use bosminer_antminer::halt;
 use bosminer_antminer::io;
+use bosminer_antminer::monitor;
 
 use bosminer_macros::WorkSolverNode;
 
