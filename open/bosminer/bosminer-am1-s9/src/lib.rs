@@ -86,9 +86,9 @@ const ENUM_RETRY_DELAY: Duration = Duration::from_secs(10);
 /// How many times to retry the enumeration
 const ENUM_RETRY_COUNT: usize = 10;
 
-/// Maximum number of chips is limitted by the fact that there is only 8-bit address field and
-/// addresses to the chips need to be assigned with step of 4 (e.g. 0, 4, 8, etc.)
-pub const MAX_CHIPS_ON_CHAIN: usize = 64;
+/// Maximum number of chips on chain (inclusive).
+/// Hard-limit is 64, any higher than that and you would have to change the addressing scheme.
+pub const MAX_CHIPS_ON_CHAIN: usize = 63;
 /// Number of chips to consider OK for initialization
 pub const EXPECTED_CHIPS_ON_CHAIN: usize = 63;
 
@@ -474,9 +474,9 @@ impl HashChain {
             }
             self.chip_count += 1;
         }
-        if self.chip_count >= MAX_CHIPS_ON_CHAIN {
+        if self.chip_count > MAX_CHIPS_ON_CHAIN {
             Err(ErrorKind::ChipEnumeration(format!(
-                "detected {} chips, expected less than {} chips on one chain. Possibly a hardware issue?",
+                "detected {} chips, expected maximum {} chips on one chain. Possibly a hardware issue?",
                 self.chip_count,
                 MAX_CHIPS_ON_CHAIN,
             )))?
