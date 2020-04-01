@@ -25,7 +25,7 @@ use tokio::time::delay_for;
 
 use bosminer_am1_s9::gpio;
 use bosminer_am1_s9::power;
-use bosminer_am1_s9::{Backend, ResetPin};
+use bosminer_am1_s9::{hashchain::ResetPin, Backend};
 
 use std::sync::Arc;
 

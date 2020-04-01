@@ -621,7 +621,7 @@ impl Register for PllReg {
 
 // TODO: how to initialize with custom XTAL frequency?
 pub static PRECOMPUTED_PLL: Lazy<Vec<PllFrequency>> =
-    Lazy::new(|| PllFrequency::precompute_pll_table(crate::CHIP_OSC_CLK_HZ));
+    Lazy::new(|| PllFrequency::precompute_pll_table(crate::hashchain::CHIP_OSC_CLK_HZ));
 
 // compute distance between two usizes
 fn distance(x: usize, y: usize) -> usize {

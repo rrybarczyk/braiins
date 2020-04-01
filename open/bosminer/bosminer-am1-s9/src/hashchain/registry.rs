@@ -20,7 +20,7 @@
 // of such proprietary license or if you have any other questions, please
 // contact us at opensource@braiins.com.
 
-use crate::Solution;
+use super::Solution;
 
 use bosminer::work;
 use std::iter::Iterator;
