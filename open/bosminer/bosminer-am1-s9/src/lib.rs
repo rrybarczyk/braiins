@@ -50,6 +50,7 @@ use bosminer_antminer::fan;
 pub use bosminer_antminer::halt;
 use bosminer_antminer::io;
 use bosminer_antminer::monitor;
+use bosminer_antminer::registry;
 use bosminer_antminer::utils;
 
 use bosminer_macros::WorkSolverNode;

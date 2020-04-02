@@ -24,7 +24,6 @@
 
 pub mod counters;
 pub mod frequency;
-pub mod registry;
 
 pub use frequency::FrequencySettings;
 
@@ -58,6 +57,7 @@ use crate::io;
 use crate::monitor;
 use crate::null_work;
 use crate::power;
+use crate::registry;
 use crate::utils;
 
 use once_cell::sync::Lazy;

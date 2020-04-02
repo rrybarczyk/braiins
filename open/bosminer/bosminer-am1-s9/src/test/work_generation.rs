@@ -25,7 +25,8 @@ use ii_logging::macros::*;
 use super::*;
 use crate::bm1387::MidstateCount;
 use crate::fan;
-use crate::hashchain::{self, registry};
+use crate::hashchain;
+use crate::registry;
 
 use bosminer::work;
 
