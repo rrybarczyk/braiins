@@ -27,6 +27,7 @@ pub mod halt;
 pub mod io;
 pub mod midstate_count;
 pub mod monitor;
+pub mod null_work;
 pub mod registry;
 pub mod utils;
 

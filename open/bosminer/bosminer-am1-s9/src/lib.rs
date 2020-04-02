@@ -27,7 +27,6 @@ pub mod error;
 pub mod gpio;
 pub mod hashchain;
 pub mod hooks;
-pub mod null_work;
 pub mod power;
 
 #[cfg(test)]
@@ -50,6 +49,7 @@ pub use bosminer_antminer::fan;
 pub use bosminer_antminer::halt;
 use bosminer_antminer::io;
 pub use bosminer_antminer::monitor;
+use bosminer_antminer::null_work;
 use bosminer_antminer::registry;
 use bosminer_antminer::utils;
 
