@@ -43,13 +43,13 @@ use bosminer::node;
 use bosminer::stats;
 use bosminer::work;
 
-use bosminer_antminer::bm1387;
+/// TODO: make pub uses non-pub and fix it in dependant crates
+pub use bosminer_antminer::bm1387;
 use bosminer_antminer::bm1387::command;
-use bosminer_antminer::fan;
-/// TODO: make this use non-pub and fix it in dependant crates
+pub use bosminer_antminer::fan;
 pub use bosminer_antminer::halt;
 use bosminer_antminer::io;
-use bosminer_antminer::monitor;
+pub use bosminer_antminer::monitor;
 use bosminer_antminer::registry;
 use bosminer_antminer::utils;
 
