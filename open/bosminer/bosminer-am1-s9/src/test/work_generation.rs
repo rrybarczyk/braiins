@@ -79,7 +79,8 @@ async fn sender_task(
     mut work_receiver: mpsc::UnboundedReceiver<work::Assignment>,
 ) {
     let mut tx_io = hash_chain.take_work_tx_io().await;
-    let mut work_registry = registry::WorkRegistry::new(tx_io.work_id_count());
+    let mut work_registry =
+        registry::WorkRegistry::<hashchain::Solution>::new(tx_io.work_id_count());
 
     loop {
         tx_io.wait_for_room().await.expect("wait for tx room");

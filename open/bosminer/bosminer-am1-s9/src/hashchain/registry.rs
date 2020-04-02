@@ -20,29 +20,28 @@
 // of such proprietary license or if you have any other questions, please
 // contact us at opensource@braiins.com.
 
-use super::Solution;
-
+use bosminer::hal;
 use bosminer::work;
 use std::iter::Iterator;
 
 /// Mining registry item contains work and solutions
 #[derive(Clone)]
-pub struct WorkRegistryItem {
+pub struct WorkRegistryItem<S> {
     work: work::Assignment,
     /// Each slot in the vector is associated with particular solution index as reported by
     /// the chips.
-    solutions: std::vec::Vec<Solution>,
+    solutions: std::vec::Vec<S>,
     /// Flag that work is only for initialization of the mining chips and any results coming from it should be ignored
     pub initial_work: bool,
 }
 
-impl WorkRegistryItem {
+impl<S: hal::BackendSolution + Clone + 'static> WorkRegistryItem<S> {
     /// Associates a specified solution with mining work, accounts for duplicates and nonce
     /// mismatches
     /// * `solution` - solution to be inserted
     /// * `solution_idx` - each work may have multiple valid solutions, this index denotes its
     /// order. The index is reported by the hashing chip
-    pub fn insert_solution(&mut self, new_solution: Solution) -> InsertSolutionStatus {
+    pub fn insert_solution(&mut self, new_solution: S) -> InsertSolutionStatus {
         let mut status = InsertSolutionStatus {
             duplicate: false,
             mismatched_nonce: false,
@@ -52,7 +51,7 @@ impl WorkRegistryItem {
         let matching_solution = self
             .solutions
             .iter()
-            .find(|solution| solution.nonce == new_solution.nonce);
+            .find(|solution| solution.nonce() == new_solution.nonce());
         if matching_solution.is_none() {
             // At this point, we know such solution has not been received yet. If it is valid (no
             // hardware error detected == meets the target), it can be appended to the solution list
@@ -65,7 +64,11 @@ impl WorkRegistryItem {
         }
 
         // report the unique solution via status
-        status.unique_solution = Some(work::Solution::new(self.work.clone(), new_solution, None));
+        status.unique_solution = Some(work::Solution::new(
+            self.work.clone(),
+            new_solution.clone(),
+            None,
+        ));
         status
     }
 }
@@ -94,16 +97,16 @@ pub struct InsertSolutionStatus {
 /// we assign work to them (under `work_id` we generate for each inserted work), but
 /// we always keep at least `registry_size / 2` slots free, so that we can detect
 /// stale work.
-pub struct WorkRegistry {
+pub struct WorkRegistry<S> {
     /// Number of elements in registry. Determines `work_id` range
     registry_size: usize,
     /// Next id that is to be assigned to work, this increases modulo `registry_size`
     next_work_id: usize,
     /// Current pending work list Each work item has a list of associated work solutions
-    pending_work_list: std::vec::Vec<Option<WorkRegistryItem>>,
+    pending_work_list: std::vec::Vec<Option<WorkRegistryItem<S>>>,
 }
 
-impl WorkRegistry {
+impl<S: hal::BackendSolution + Clone> WorkRegistry<S> {
     /// Create new registry with `registry_size` slots
     pub fn new(registry_size: usize) -> Self {
         Self {
@@ -147,7 +150,7 @@ impl WorkRegistry {
     }
 
     /// Look-up work id
-    pub fn find_work(&mut self, work_id: usize) -> &mut Option<WorkRegistryItem> {
+    pub fn find_work(&mut self, work_id: usize) -> &mut Option<WorkRegistryItem<S>> {
         assert!(work_id < self.registry_size);
         &mut self.pending_work_list[work_id]
     }
@@ -156,12 +159,34 @@ impl WorkRegistry {
 #[cfg(test)]
 mod test {
     use super::*;
+
     use crate::null_work;
+
+    #[derive(Debug, Clone)]
+    struct NullSolution(ii_bitcoin::Target);
+
+    impl hal::BackendSolution for NullSolution {
+        fn nonce(&self) -> u32 {
+            0
+        }
+
+        fn midstate_idx(&self) -> usize {
+            0
+        }
+
+        fn solution_idx(&self) -> usize {
+            0
+        }
+
+        fn target(&self) -> &ii_bitcoin::Target {
+            &self.0
+        }
+    }
 
     /// Test that it's possible to store work
     #[test]
     fn test_store_work() {
-        let mut registry = WorkRegistry::new(4);
+        let mut registry = WorkRegistry::<NullSolution>::new(4);
         let work1 = null_work::prepare(0);
         let work2 = null_work::prepare(1);
 
@@ -177,7 +202,7 @@ mod test {
     fn test_store_work_retiring() {
         const REGISTRY_SIZE: usize = 8;
         const NUM_WORK_ITEMS: usize = REGISTRY_SIZE * 2 + REGISTRY_SIZE / 2 + 1;
-        let mut registry = WorkRegistry::new(REGISTRY_SIZE);
+        let mut registry = WorkRegistry::<NullSolution>::new(REGISTRY_SIZE);
 
         // we store more than REGISTRY_SIZE items so it has to roll over
         for i in 0..NUM_WORK_ITEMS {
@@ -203,7 +228,7 @@ mod test {
     #[test]
     fn test_work_id_wrap_around() {
         const REGISTRY_SIZE: usize = 4;
-        let mut registry = WorkRegistry::new(REGISTRY_SIZE);
+        let mut registry = WorkRegistry::<NullSolution>::new(REGISTRY_SIZE);
         let work = null_work::prepare(0);
         assert_eq!(registry.store_work(work.clone(), false), 0);
         assert_eq!(registry.store_work(work.clone(), false), 1);
@@ -215,7 +240,7 @@ mod test {
     /// Test that `initial_work` flag propagates to `WorkRegistryItem`
     #[test]
     fn test_initial_work() {
-        let mut registry = WorkRegistry::new(4);
+        let mut registry = WorkRegistry::<NullSolution>::new(4);
         let work1 = null_work::prepare(0);
         let work2 = null_work::prepare(0);
 

@@ -477,7 +477,7 @@ impl HashChain {
         initial_frequency: &FrequencySettings,
         initial_voltage: power::Voltage,
         accept_less_chips: bool,
-    ) -> error::Result<Arc<Mutex<registry::WorkRegistry>>> {
+    ) -> error::Result<Arc<Mutex<registry::WorkRegistry<Solution>>>> {
         info!("Hashboard IP core initialized");
         self.voltage_ctrl
             .clone()
@@ -694,7 +694,10 @@ impl HashChain {
     }
 
     /// Initialize cores by sending open-core work with correct nbits to each core
-    async fn send_init_work(&mut self, work_registry: Arc<Mutex<registry::WorkRegistry>>) {
+    async fn send_init_work(
+        &mut self,
+        work_registry: Arc<Mutex<registry::WorkRegistry<Solution>>>,
+    ) {
         // Each core gets one work
         const NUM_WORK: usize = bm1387::NUM_CORES_ON_CHIP;
         trace!(
@@ -720,7 +723,7 @@ impl HashChain {
     /// generator.
     /// It exits when generator returns `None`.
     async fn work_tx_task(
-        work_registry: Arc<Mutex<registry::WorkRegistry>>,
+        work_registry: Arc<Mutex<registry::WorkRegistry<Solution>>>,
         mut tx_fifo: io::WorkTx,
         mut work_generator: work::Generator,
     ) {
@@ -748,7 +751,7 @@ impl HashChain {
     /// TODO: figure out when and how to stop this task
     async fn solution_rx_task(
         self: Arc<Self>,
-        work_registry: Arc<Mutex<registry::WorkRegistry>>,
+        work_registry: Arc<Mutex<registry::WorkRegistry<Solution>>>,
         mut rx_fifo: io::WorkRx,
         solution_sender: work::SolutionSender,
         counter: Arc<Mutex<counters::HashChain>>,
@@ -944,7 +947,7 @@ impl HashChain {
         self: Arc<Self>,
         work_generator: work::Generator,
         solution_sender: work::SolutionSender,
-        work_registry: Arc<Mutex<registry::WorkRegistry>>,
+        work_registry: Arc<Mutex<registry::WorkRegistry<Solution>>>,
     ) {
         // spawn tx task
         let tx_fifo = self.take_work_tx_io().await;
