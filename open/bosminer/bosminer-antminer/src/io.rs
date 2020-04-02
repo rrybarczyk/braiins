@@ -68,6 +68,14 @@ pub const F_CLK_SPEED_HZ: usize = 50_000_000;
 /// Divisor of the base clock. The resulting clock is connected to UART
 pub const F_CLK_BASE_BAUD_DIV: usize = 8;
 
+/// Helper method to convert seconds to FPGA ticks suitable to be written
+/// to `WORK_TIME` FPGA register.
+///
+/// Returns number of ticks.
+pub fn secs_to_fpga_ticks(secs: f64) -> u32 {
+    (secs * F_CLK_SPEED_HZ as f64) as u32
+}
+
 /// Util structure to help us work with enums
 #[derive(Debug, Clone, PartialEq)]
 enum MinerType {
@@ -819,5 +827,12 @@ mod test {
     fn test_build_id_display() {
         let build_id = BuildId(0x5D8255F0);
         assert_eq!(build_id.to_string(), "2019-09-18 16:06:08 UTC");
+    }
+
+    /// Test work_time computation
+    #[test]
+    fn test_work_time_computation() {
+        // you need to recalc this if you change asic diff or fpga freq
+        assert_eq!(secs_to_fpga_ticks(0.00072592), 36296);
     }
 }

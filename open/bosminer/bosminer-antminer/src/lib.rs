@@ -27,5 +27,6 @@ pub mod halt;
 pub mod io;
 pub mod midstate_count;
 pub mod monitor;
+pub mod utils;
 
 pub use midstate_count::MidstateCount;

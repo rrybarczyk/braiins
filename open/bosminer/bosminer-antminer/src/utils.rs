@@ -1,18 +1,18 @@
-// Copyright (C) 2020  Braiins Systems s.r.o.
+// Copyright (C) 2019  Braiins Systems s.r.o.
 //
 // This file is part of Braiins Open-Source Initiative (BOSI).
 //
 // BOSI is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Common Public License as published by
+// it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
 // This program is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Common Public License for more details.
+// GNU General Public License for more details.
 //
-// You should have received a copy of the GNU Common Public License
+// You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //
 // Please, keep in mind that we may also license BOSI or any part thereof
@@ -20,9 +20,10 @@
 // of such proprietary license or if you have any other questions, please
 // contact us at opensource@braiins.com.
 
-//! Utilities to calculate baudrates
+//! Utilities to calculate baudrates, register packing
 
 use crate::error::{self, ErrorKind};
+use packed_struct::prelude::*;
 
 /// Helper method that calculates baud rate clock divisor value for the specified baud rate.
 ///
@@ -60,46 +61,24 @@ pub fn calc_baud_clock_div(
     Ok((baud_div, actual_baud_rate))
 }
 
-/// Helper method to calculate time to finish one piece of work
-///
-/// * `n_midstates` - number of midstates
-/// * `pll_frequency` - frequency of chip in Hz
-/// Return a number of seconds.
-///
-/// The formula for work_delay is:
-///
-///   work_delay = space_size_of_one_work / computation_speed; [sec, hashes, hashes_per_sec]
-///
-/// In our case it would be
-///
-///   work_delay = n_midstates * 2^32 / (freq * num_chips * cores_per_chip)
-///
-/// Unfortunately the space is not divided evenly, some nonces get never computed.
-/// The current conjecture is that nonce space is divided by chip/core address,
-/// ie. chip number 0x1a iterates all nonces 0x1axxxxxx. That's 6 bits of chip_address
-/// and 7 bits of core_address. Putting it all together:
-///
-///   work_delay = n_midstates * num_chips * cores_per_chip * 2^(32 - 7 - 6) / (freq * num_chips * cores_per_chip)
-///
-/// Simplify:
-///
-///   work_delay = n_midstates * 2^19 / freq
-///
-/// Last but not least, we apply fudge factor of 0.9 and send work 11% faster to offset
-/// delays when sending out/generating work/chips not getting proper work...:
-///
-///   work_delay = 0.9 * n_midstates * 2^19 / freq
-pub fn calculate_work_delay_for_pll(n_midstates: usize, pll_frequency: usize) -> f64 {
-    let space_size_per_core: u64 = 1 << 19;
-    0.9 * (n_midstates as u64 * space_size_per_core) as f64 / pll_frequency as f64
+/// Just an util trait so that we can pack/unpack directly to registers
+pub trait PackedRegister: Sized {
+    fn from_reg(reg: u32) -> Self;
+    fn to_reg(&self) -> u32;
 }
 
-/// Helper method to convert seconds to FPGA ticks suitable to be written
-/// to `WORK_TIME` FPGA register.
-///
-/// Returns number of ticks.
-pub fn secs_to_fpga_ticks(fpga_freq: usize, secs: f64) -> u32 {
-    (secs * fpga_freq as f64) as u32
+impl<T> PackedRegister for T
+where
+    T: PackedStruct<[u8; 4]>,
+{
+    /// Take register and unpack (as big endian)
+    fn from_reg(reg: u32) -> Self {
+        Self::unpack(&u32::to_be_bytes(reg)).expect("unpacking error")
+    }
+    /// Pack into big-endian register
+    fn to_reg(&self) -> u32 {
+        u32::from_be_bytes(self.pack())
+    }
 }
 
 #[cfg(test)]
@@ -107,8 +86,9 @@ mod test {
     use super::*;
 
     use crate::bm1387;
-    use crate::hashchain;
     use crate::io;
+
+    const CHIP_OSC_CLK_HZ: usize = 25_000_000;
 
     #[test]
     fn test_calc_baud_div_correct_baud_rate_bm1387() {
@@ -122,7 +102,7 @@ mod test {
         for (baud_rate, baud_div) in correct_bauds_and_divs.iter() {
             let (baud_clock_div, actual_baud_rate) = calc_baud_clock_div(
                 *baud_rate,
-                hashchain::CHIP_OSC_CLK_HZ,
+                CHIP_OSC_CLK_HZ,
                 bm1387::CHIP_OSC_CLK_BASE_BAUD_DIV,
             )
             .unwrap();
@@ -151,25 +131,12 @@ mod test {
     fn test_calc_baud_div_over_baud_rate_bm1387() {
         let result = calc_baud_clock_div(
             3_500_000,
-            hashchain::CHIP_OSC_CLK_HZ,
+            CHIP_OSC_CLK_HZ,
             bm1387::CHIP_OSC_CLK_BASE_BAUD_DIV,
         );
         assert!(
             result.is_err(),
             "Baud clock divisor unexpectedly calculated!"
-        );
-    }
-
-    /// Test work_time computation
-    #[test]
-    fn test_work_time_computation() {
-        // you need to recalc this if you change asic diff or fpga freq
-        assert_eq!(
-            secs_to_fpga_ticks(
-                io::F_CLK_SPEED_HZ,
-                calculate_work_delay_for_pll(1, 650_000_000)
-            ),
-            36296
         );
     }
 }

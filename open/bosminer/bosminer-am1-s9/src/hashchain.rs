@@ -25,7 +25,6 @@
 pub mod counters;
 pub mod frequency;
 pub mod registry;
-mod utils;
 
 pub use frequency::FrequencySettings;
 
@@ -59,6 +58,7 @@ use crate::io;
 use crate::monitor;
 use crate::null_work;
 use crate::power;
+use crate::utils;
 
 use once_cell::sync::Lazy;
 
@@ -197,6 +197,40 @@ impl hal::BackendSolution for Solution {
     }
 }
 
+/// Helper method to calculate time to finish one piece of work
+///
+/// * `n_midstates` - number of midstates
+/// * `pll_frequency` - frequency of chip in Hz
+/// Return a number of seconds.
+///
+/// The formula for work_delay is:
+///
+///   work_delay = space_size_of_one_work / computation_speed; [sec, hashes, hashes_per_sec]
+///
+/// In our case it would be
+///
+///   work_delay = n_midstates * 2^32 / (freq * num_chips * cores_per_chip)
+///
+/// Unfortunately the space is not divided evenly, some nonces get never computed.
+/// The current conjecture is that nonce space is divided by chip/core address,
+/// ie. chip number 0x1a iterates all nonces 0x1axxxxxx. That's 6 bits of chip_address
+/// and 7 bits of core_address. Putting it all together:
+///
+///   work_delay = n_midstates * num_chips * cores_per_chip * 2^(32 - 7 - 6) / (freq * num_chips * cores_per_chip)
+///
+/// Simplify:
+///
+///   work_delay = n_midstates * 2^19 / freq
+///
+/// Last but not least, we apply fudge factor of 0.9 and send work 11% faster to offset
+/// delays when sending out/generating work/chips not getting proper work...:
+///
+///   work_delay = 0.9 * n_midstates * 2^19 / freq
+fn calculate_work_delay_for_pll(n_midstates: usize, pll_frequency: usize) -> f64 {
+    let space_size_per_core: u64 = 1 << 19;
+    0.9 * (n_midstates as u64 * space_size_per_core) as f64 / pll_frequency as f64
+}
+
 /// Hash Chain Controller provides abstraction of the FPGA interface for operating hashing boards.
 /// It is the user-space driver for the IP Core
 ///
@@ -325,12 +359,14 @@ impl HashChain {
     /// Calculate work_time for this instance of HChain
     ///
     /// Returns number of ticks (suitable to be written to `WORK_TIME` register)
+    ///
+    /// TODO: move this function to `io.rs`
     #[inline]
     fn calculate_work_time(&self, max_pll_frequency: usize) -> u32 {
-        utils::secs_to_fpga_ticks(
-            io::F_CLK_SPEED_HZ,
-            utils::calculate_work_delay_for_pll(self.midstate_count.to_count(), max_pll_frequency),
-        )
+        io::secs_to_fpga_ticks(calculate_work_delay_for_pll(
+            self.midstate_count.to_count(),
+            max_pll_frequency,
+        ))
     }
 
     /// Set work time depending on current PLL frequency
@@ -979,5 +1015,20 @@ impl fmt::Debug for HashChain {
 impl fmt::Display for HashChain {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Hash Board {}", self.hashboard_idx)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    /// Test work_time computation
+    #[test]
+    fn test_work_time_computation() {
+        // you need to recalc this if you change asic diff or fpga freq
+        assert_eq!(
+            io::secs_to_fpga_ticks(calculate_work_delay_for_pll(1, 650_000_000)),
+            36296
+        );
     }
 }

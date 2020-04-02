@@ -29,7 +29,6 @@ pub mod hashchain;
 pub mod hooks;
 pub mod null_work;
 pub mod power;
-pub mod utils;
 
 #[cfg(test)]
 pub mod test;
@@ -51,6 +50,7 @@ use bosminer_antminer::fan;
 pub use bosminer_antminer::halt;
 use bosminer_antminer::io;
 use bosminer_antminer::monitor;
+use bosminer_antminer::utils;
 
 use bosminer_macros::WorkSolverNode;
 
