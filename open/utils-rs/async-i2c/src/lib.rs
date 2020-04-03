@@ -20,7 +20,7 @@
 // of such proprietary license or if you have any other questions, please
 // contact us at opensource@braiins.com.
 
-//! Async I2C bus interface defition and utility functions
+//! Async I2C bus interface definition and utility functions
 
 pub mod test_utils;
 
