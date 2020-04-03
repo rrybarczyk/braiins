@@ -16,7 +16,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //
 // Please, keep in mind that we may also license BOSI or any part thereof
-// under a propreitary license. For more information on the terms and conditions
+// under a proprietary license. For more information on the terms and conditions
 // of such proprietary license or if you have any other questions, please
 // contact us at opensource@braiins.com.
 
