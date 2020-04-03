@@ -33,8 +33,9 @@ async fn test_hchain_ctl_instance() {
     let voltage_ctrl_backend = Arc::new(power::I2cBackend::new(0));
     let (monitor_sender, _monitor_receiver) = mpsc::unbounded();
     let reset_pin =
-        hashchain::ResetPin::open(&gpio_mgr, hashboard_idx).expect("failed to make pin");
-    let plug_pin = hashchain::PlugPin::open(&gpio_mgr, hashboard_idx).expect("failed to make pin");
+        hashchain::ResetPin::open(&gpio_mgr, hashboard_idx).expect("BUG: failed to make pin");
+    let plug_pin =
+        hashchain::PlugPin::open(&gpio_mgr, hashboard_idx).expect("BUG: failed to make pin");
 
     let hash_chain = hashchain::HashChain::new(
         reset_pin,

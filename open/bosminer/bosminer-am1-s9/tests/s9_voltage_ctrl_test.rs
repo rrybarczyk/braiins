@@ -41,7 +41,8 @@ async fn test_voltage_ctrl_on_1_hashboard(
     gpio_mgr: &gpio::ControlPinManager,
     hashboard_idx: usize,
 ) {
-    let mut reset_pin = ResetPin::open(gpio_mgr, hashboard_idx).expect("failed to make reset pin");
+    let mut reset_pin =
+        ResetPin::open(gpio_mgr, hashboard_idx).expect("BUG: failed to make reset pin");
 
     // perform reset of the hashboard
     reset_pin.enter_reset().unwrap();
@@ -71,7 +72,8 @@ async fn test_voltage_ctrl_all_hashboards() {
     let expected_tested_hashboards: usize = 1;
 
     let gpio_mgr = gpio::ControlPinManager::new();
-    for hashboard_idx in Backend::detect_hashboards(&gpio_mgr).expect("failed to detect hashboards")
+    for hashboard_idx in
+        Backend::detect_hashboards(&gpio_mgr).expect("BUG: failed to detect hashboards")
     {
         test_voltage_ctrl_on_1_hashboard(&gpio_mgr, hashboard_idx).await;
         tested_hashboards += 1;
