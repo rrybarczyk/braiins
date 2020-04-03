@@ -141,8 +141,8 @@ impl AsyncI2cDev {
         };
         self.request_tx
             .unbounded_send(request)
-            .expect("I2C request failed");
-        reply_rx.await.expect("failed to receive I2C reply")
+            .expect("BUG: I2C request failed");
+        reply_rx.await.expect("BUG: failed to receive I2C reply")
     }
 
     pub async fn write(&self, address: u8, bytes: Vec<u8>) -> Result<()> {
@@ -154,8 +154,8 @@ impl AsyncI2cDev {
         };
         self.request_tx
             .unbounded_send(request)
-            .expect("I2C request failed");
-        reply_rx.await.expect("failed to receive I2C reply")
+            .expect("BUG: I2C request failed");
+        reply_rx.await.expect("BUG: failed to receive I2C reply")
     }
 }
 
