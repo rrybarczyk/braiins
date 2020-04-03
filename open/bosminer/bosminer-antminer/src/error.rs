@@ -165,5 +165,17 @@ impl From<uio_async::UioError> for Error {
     }
 }
 
+impl From<Error> for ii_async_i2c::Error {
+    fn from(error: Error) -> Self {
+        ii_async_i2c::Error::General(error.to_string())
+    }
+}
+
+impl From<ErrorKind> for ii_async_i2c::Error {
+    fn from(error_kind: ErrorKind) -> Self {
+        ii_async_i2c::Error::General(error_kind.to_string())
+    }
+}
+
 /// A specialized `Result` type bound to [`Error`].
 pub type Result<T> = std::result::Result<T, Error>;

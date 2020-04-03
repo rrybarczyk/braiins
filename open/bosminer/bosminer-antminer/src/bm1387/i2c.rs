@@ -166,7 +166,9 @@ impl<T: CommandInterface> i2c::Bus for Bus<T> {
             }
             delay_for(Bus::<T>::FAIL_TRY_DELAY).await;
         }
-        Err("Hashchip I2C controller keeps reading wrong address/register")?
+        Err(i2c::Error::General(
+            "I2C controller keeps reading wrong address/register".to_string(),
+        ))
     }
 }
 

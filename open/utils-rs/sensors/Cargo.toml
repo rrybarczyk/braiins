@@ -13,3 +13,4 @@ ii-logging = { path = "../../utils-rs/logging" }
 lazy_static = "1.3"
 packed_struct = "0.3.0"
 packed_struct_codegen = "0.3.0"
+thiserror = "1.0"

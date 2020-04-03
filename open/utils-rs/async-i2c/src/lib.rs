@@ -27,27 +27,26 @@ pub mod test_utils;
 use async_trait::async_trait;
 use std::fmt::{self, Display};
 use std::sync::Arc;
+use thiserror::Error;
 
 use futures::lock::Mutex;
 use ii_async_compat::futures;
 
 /// Local error definition
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
+    #[error("failed to read back the specified data from address {0}: written {1:#02x} but read {2:#02x}")]
     FailedReadBack(u8, u8, u8),
+    #[error("invalid address test {0}")]
     TestInvalidAddress(Address),
+    #[error("inaccessible register address {0} value {1}")]
     TestInaccessibleRegister(Address, u8),
+    #[error("general error {0}")]
     General(String),
 }
 
-impl<E: Display> From<E> for Error {
-    fn from(e: E) -> Self {
-        Error::General(e.to_string())
-    }
-}
-
 /// Convenience type alias
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, self::Error>;
 
 /// Struct representing I2C address
 #[derive(Clone, Copy, Debug, PartialEq)]

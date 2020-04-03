@@ -38,8 +38,18 @@ use linux_embedded_hal::I2cdev;
 use std::convert::AsRef;
 use std::path::Path;
 
-/// Just use strings here
-type Result<T> = std::result::Result<T, String>;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("I2C error")]
+    I2cError {
+        #[from]
+        source: linux_embedded_hal::i2cdev::linux::LinuxI2CError,
+    },
+}
+
+pub type Result<T> = std::result::Result<T, self::Error>;
 
 enum Request {
     Read {
@@ -74,7 +84,7 @@ fn serve_requests(
                 let result = i2c_device
                     .read(address, &mut bytes)
                     .map(|_| bytes)
-                    .map_err(|e| format!("async_linux_i2c: read: {}", e));
+                    .map_err(|e| e.into());
                 if reply.send(result).is_err() {
                     warn!("AsyncI2c reply send failed - remote side may have ended");
                 }
@@ -84,9 +94,7 @@ fn serve_requests(
                 bytes,
                 reply,
             } => {
-                let result = i2c_device
-                    .write(address, &bytes)
-                    .map_err(|e| format!("async_linux_i2c: write: {}", e));
+                let result = i2c_device.write(address, &bytes).map_err(|e| e.into());
                 if reply.send(result).is_err() {
                     warn!("AsyncI2c reply send failed - remote side may have ended");
                 }
@@ -110,7 +118,7 @@ impl AsyncI2cDev {
     /// Although this function is not async, it has to be called from within Tokio context
     /// because it spawns task in a separate thread that serves the (blocking) I2C requests.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let i2c_device = I2cdev::new(path).map_err(|e| format!("async_linux_i2c: open: {}", e))?;
+        let i2c_device = I2cdev::new(path)?;
         let (request_tx, request_rx) = mpsc::unbounded();
 
         // Spawn the future in a separate blocking pool (for blocking operations)

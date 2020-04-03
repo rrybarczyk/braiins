@@ -45,20 +45,18 @@ use async_trait::async_trait;
 use ii_logging::macros::*;
 use lazy_static::lazy_static;
 use std::boxed::Box;
+use thiserror::Error;
 
-/// Each crate has to have its own error
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
-    I2cError(i2c::Error),
+    #[error("I2C error")]
+    I2cError {
+        #[from]
+        source: i2c::Error,
+    },
 }
 
-impl From<i2c::Error> for Error {
-    fn from(e: i2c::Error) -> Self {
-        Self::I2cError(e)
-    }
-}
-
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, self::Error>;
 
 /// Generic sensor
 #[async_trait]

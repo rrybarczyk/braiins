@@ -68,6 +68,10 @@ pub enum ErrorKind {
     #[fail(display = "I2C: {}", _0)]
     I2c(String),
 
+    /// I2C errors.
+    #[fail(display = "Linux I2C: {}", _0)]
+    LinuxI2c(String),
+
     /// Power controller errors.
     #[fail(display = "Power: {}", _0)]
     Power(String),
@@ -191,6 +195,12 @@ impl From<i2c::Error> for Error {
 impl From<sensor::Error> for Error {
     fn from(e: sensor::Error) -> Self {
         ErrorKind::Sensors(format!("{:?}", e)).into()
+    }
+}
+
+impl From<ii_linux_async_i2c::Error> for Error {
+    fn from(e: ii_linux_async_i2c::Error) -> Self {
+        ErrorKind::LinuxI2c(format!("{:?}", e)).into()
     }
 }
 
