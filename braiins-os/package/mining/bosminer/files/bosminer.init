@@ -49,6 +49,10 @@ boot()
 		local miner_voltage=$(get_env_config miner_voltage)
 		local miner_fixed_freq=$(get_env_config miner_fixed_freq)
 
+		# use the public key of our pool that allows authentication of the default Stratum V2 host
+		[ -z "$pool_path" -a -z "$pool_host" ] && \
+		pool_path="u95GEReVMjK6k5YqiSFNqqTnKU4ypU2Wm8awa6tmbmDmk1bWt"
+
 		pool_host=${pool_host:-stratum2+tcp://v2.stratum.slushpool.com}
 		pool_user=${pool_user:-!non-existent-user!}
 
