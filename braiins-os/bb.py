@@ -200,7 +200,7 @@ class CommandManager:
 
         config_original = bos_builder.load_config(self._args.config)
         builder = self.get_builder('checkout')
-        builder.release(self._args.stage, config_original, push=not self._args.no_push)
+        builder.release(self._args.stage, config_original, push=not self._args.no_push, force=self._args.force)
 
     def key(self):
         logging.debug("Called command 'key'")
@@ -308,6 +308,8 @@ def main(argv):
                            help='do not force fetching all repositories before execution release stage')
     subparser.add_argument('--no-push', action='store_true',
                            help='do not push changes to upstream')
+    subparser.add_argument('--force', action='store_true',
+                           help='skip some checks and try to force')
     subparser.add_argument('stage', choices=['begin', 'freeze', 'end'], default='begin',
                            help='release process stage')
 

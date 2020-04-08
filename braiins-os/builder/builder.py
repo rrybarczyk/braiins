@@ -2554,7 +2554,7 @@ class Builder:
             return True
         return remotes and any((branch_name == remote.remote_head for remote in repo.remotes.origin.refs))
 
-    def _release_begin(self, repo_meta, config_original, push):
+    def _release_begin(self, repo_meta, config_original, push, force):
         """
         Create new release branches for monorepo and all related repositories
 
@@ -2573,38 +2573,40 @@ class Builder:
 
         if self._has_branch(repo_meta, branch_name):
             logging.error("Branch '{}' already exists!".format(branch_name))
-            raise BuilderStop
+            if not force:
+                raise BuilderStop
 
         for name, repo in self._repos.items():
             if self._has_branch(repo, branch_name):
                 logging.error("Branch '{}' in repository '{}' already exists!".format(branch_name, name))
-                raise BuilderStop
+                if not force:
+                    raise BuilderStop
 
         logging.info("Creating new '{}' branches...".format(branch_name))
         logging.info("- monorepo")
-        repo_meta.create_head(branch_name)
+        repo_meta.create_head(branch_name, force=force)
         for name, repo in self._repos.items():
             # do not create new branch for repositories checked out on specific commit
             if not repo.head.is_detached:
                 logging.info("- {}".format(name))
-                repo.create_head(branch_name)
+                repo.create_head(branch_name, force=force)
 
         if push:
             logging.info("Pushing newly created branches to remote...")
             logging.info("- monorepo")
-            repo_meta.remotes.origin.push(branch_name, set_upstream=True)
+            repo_meta.remotes.origin.push(branch_name, force=force, set_upstream=True)
             for name, repo in self._repos.items():
                 if not repo.head.is_detached:
                     logging.info("- {}".format(name))
-                    repo.remotes.origin.push(branch_name, set_upstream=True)
+                    repo.remotes.origin.push(branch_name, force=force, set_upstream=True)
 
-    def _release_freeze(self, repo_meta, config_original, push):
+    def _release_freeze(self, repo_meta, config_original, push, force):
         pass
 
-    def _release_end(self, repo_meta, config_original, push):
+    def _release_end(self, repo_meta, config_original, push, force):
         pass
 
-    def release(self, stage, config_original, push=True):
+    def release(self, stage, config_original, push=True, force=False):
         """
         Create release branch in git based on current configuration
 
@@ -2619,6 +2621,8 @@ class Builder:
             Original configuration tree before changes.
         :param push:
             Push all changes to upstream.
+        :param force:
+            Try to solve some errors by forcing.
         """
         repo_meta = git.Repo(search_parent_directories=True)
 
@@ -2630,12 +2634,14 @@ class Builder:
 
         if repo_meta.is_dirty(untracked_files=True):
             logging.error("Meta repository is dirty!")
-            raise BuilderStop
+            if not force:
+                raise BuilderStop
 
         for name, repo in self._repos.items():
             if repo and repo.is_dirty(untracked_files=True):
                 logging.error("Repository '{}' is dirty!".format(name))
-                raise BuilderStop
+                if not force:
+                    raise BuilderStop
 
         # synchronise upstream repository with local one (fetch all tags)
         logging.debug("Fetching remote repository...")
@@ -2644,14 +2650,15 @@ class Builder:
         commits_ahead, commits_behind = self._count_commits(repo_meta, branch_name)
         if commits_ahead or commits_behind:
             logging.error("Your branch and 'origin/{}' have diverged,".format(branch_name))
-            raise BuilderStop
+            if not force:
+                raise BuilderStop
 
         stage_handler = {
             'begin': self._release_begin,
             'freeze': self._release_freeze,
             'end': self._release_end,
         }
-        stage_handler[stage](repo_meta, config_original, push)
+        stage_handler[stage](repo_meta, config_original, push, force)
 
     def generate_key(self, secret_path, public_path):
         """
