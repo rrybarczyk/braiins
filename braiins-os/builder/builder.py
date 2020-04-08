@@ -2548,7 +2548,63 @@ class Builder:
                 logging.debug("Set repository '{}/{}' to commit {}...".format(name, pattern, commit_sha))
                 config.remote.repos.get(name).match.get(pattern).branch = commit_sha
 
-    def release(self, config_original, push=True):
+    @staticmethod
+    def _has_branch(repo, branch_name, remotes=True):
+        if branch_name in repo.heads:
+            return True
+        return remotes and any((branch_name == remote.remote_head for remote in repo.remotes.origin.refs))
+
+    def _release_begin(self, repo_meta, config_original, push):
+        """
+        Create new release branches for monorepo and all related repositories
+
+        This is the first stage of release process where is created new branch for all repositories.
+        Development continues on master branch and newly created branch is intended only for testing.
+        Critical bug fixes are cherry-picked from master branch.
+
+        :param repo_meta:
+            Monorepo repository with current project.
+        :param config_original:
+            Original configuration tree before changes.
+        :param push:
+            Push all changes to upstream.
+        """
+        branch_name = self._config.release.begin.branch
+
+        if self._has_branch(repo_meta, branch_name):
+            logging.error("Branch '{}' already exists!".format(branch_name))
+            raise BuilderStop
+
+        for name, repo in self._repos.items():
+            if self._has_branch(repo, branch_name):
+                logging.error("Branch '{}' in repository '{}' already exists!".format(branch_name, name))
+                raise BuilderStop
+
+        logging.info("Creating new '{}' branches...".format(branch_name))
+        logging.info("- monorepo")
+        repo_meta.create_head(branch_name)
+        for name, repo in self._repos.items():
+            # do not create new branch for repositories checked out on specific commit
+            if not repo.head.is_detached:
+                logging.info("- {}".format(name))
+                repo.create_head(branch_name)
+
+        if push:
+            logging.info("Pushing newly created branches to remote...")
+            logging.info("- monorepo")
+            repo_meta.remotes.origin.push(branch_name, set_upstream=True)
+            for name, repo in self._repos.items():
+                if not repo.head.is_detached:
+                    logging.info("- {}".format(name))
+                    repo.remotes.origin.push(branch_name, set_upstream=True)
+
+    def _release_freeze(self, repo_meta, config_original, push):
+        pass
+
+    def _release_end(self, repo_meta, config_original, push):
+        pass
+
+    def release(self, stage, config_original, push=True):
         """
         Create release branch in git based on current configuration
 
@@ -2557,6 +2613,8 @@ class Builder:
         * create new commit with modified configuration
         * tag new commit with firmware version and push it upstream
 
+        :param stage:
+            Release process stage.
         :param config_original:
             Original configuration tree before changes.
         :param push:
@@ -2568,9 +2626,7 @@ class Builder:
             logging.error("Meta repository is detached!")
             raise BuilderStop
 
-        # save active branch to return back after creating release
-        meta_active_branch = repo_meta.active_branch
-        branch_name = meta_active_branch.name
+        branch_name = repo_meta.active_branch.name
 
         if repo_meta.is_dirty(untracked_files=True):
             logging.error("Meta repository is dirty!")
@@ -2590,56 +2646,12 @@ class Builder:
             logging.error("Your branch and 'origin/{}' have diverged,".format(branch_name))
             raise BuilderStop
 
-        # get short version for 'whatsnew.md' header
-        fw_version_short = self.get_firmware_version(short=True, local_time=True)
-        self.patch_whatsnew(self.WHATS_NEW, fw_version_short)
-
-        # create commit with patched whatsnew file
-        # repo_meta.working_tree_dir
-        repo_meta.index.add([os.path.relpath(self.WHATS_NEW, repo_meta.working_tree_dir)])
-        repo_meta.index.commit(self.WHATS_NEW_COMMENT)
-
-        logging.debug("Detaching head from branch...")
-        repo_meta.head.reference = repo_meta.head.commit
-
-        # copy configuration for modifications
-        config = copy.deepcopy(config_original)
-
-        # always checkout all repositories to correct commit
-        config.remote.fetch_always = 'yes'
-
-        logging.debug("Patching repository branches in config...")
-        self.patch_config_branches(config_original, config)
-
-        logging.info("Saving default configuration file to {}...".format(self.DEFAULT_CONFIG))
-        with open(os.path.join(self.DEFAULT_CONFIG), 'w') as default_config:
-            config.dump(default_config)
-
-        logging.debug("Creating new release commit...")
-        repo_meta.index.add([os.path.relpath(self.DEFAULT_CONFIG, repo_meta.working_tree_dir)])
-        repo_meta.index.commit("Release Firmware")
-
-        fw_version_long = self.get_firmware_version()
-        fw_version = '{}_{}'.format(self.FEED_FIRMWARE, fw_version_long)
-
-        # check if full version has the same prefix as short one
-        # it can happen when release is done just before midnight
-        if not fw_version_long.startswith(fw_version_short):
-            meta_active_branch.checkout()
-            repo_meta.head.reset('HEAD~1')
-            logging.error("Created wrong short version for '{}'".format(self.WHATS_NEW))
-            logging.warning("Try to run release script again! This happens when release is done just before midnight")
-            raise BuilderStop
-
-        logging.info("Creating new release tag '{}'...".format(fw_version))
-        repo_meta.create_tag(fw_version)
-        if push:
-            repo_meta.remotes.origin.push(fw_version)
-
-        # return back to active branch
-        meta_active_branch.checkout()
-        if push:
-            repo_meta.remotes.origin.push()
+        stage_handler = {
+            'begin': self._release_begin,
+            'freeze': self._release_freeze,
+            'end': self._release_end,
+        }
+        stage_handler[stage](repo_meta, config_original, push)
 
     def generate_key(self, secret_path, public_path):
         """

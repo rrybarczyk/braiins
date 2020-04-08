@@ -200,7 +200,7 @@ class CommandManager:
 
         config_original = bos_builder.load_config(self._args.config)
         builder = self.get_builder('checkout')
-        builder.release(config_original, push=not self._args.no_push)
+        builder.release(self._args.stage, config_original, push=not self._args.no_push)
 
     def key(self):
         logging.debug("Called command 'key'")
@@ -302,12 +302,14 @@ def main(argv):
 
     # create the parser for the "release" command
     subparser = subparsers.add_parser('release',
-                                      help="create branch with configuration for release version")
+                                      help="run specific stage of release process")
     subparser.set_defaults(func=command.release)
     subparser.add_argument('--no-fetch', action='store_true',
-                           help='do not force fetching all repositories before creating release configuration')
+                           help='do not force fetching all repositories before execution release stage')
     subparser.add_argument('--no-push', action='store_true',
                            help='do not push changes to upstream')
+    subparser.add_argument('stage', choices=['begin', 'freeze', 'end'], default='begin',
+                           help='release process stage')
 
     # create the parser for the "key" command
     subparser = subparsers.add_parser('key',

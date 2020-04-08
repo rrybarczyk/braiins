@@ -239,3 +239,9 @@ deploy:
     username: root
     # ssh password
     password:
+
+release:
+  begin:
+    branch: bos-stable
+  freeze:
+    branch: bos-release
