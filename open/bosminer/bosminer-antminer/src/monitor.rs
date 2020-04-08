@@ -34,7 +34,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use futures::channel::mpsc;
-use futures::lock::Mutex;
+use futures::lock::{Mutex, MutexGuard};
 use futures::stream::StreamExt;
 use ii_async_compat::futures;
 use ii_async_compat::tokio;
@@ -525,9 +525,11 @@ impl Monitor {
     }
 
     /// Shutdown miner
-    async fn shutdown(&self, inner: &mut MonitorInner, reason: String) {
+    async fn shutdown(&self, mut inner: MutexGuard<'_, MonitorInner>, reason: String) {
         error!("Monitor task declared miner shutdown: {}", reason);
         inner.failure_state = true;
+        // Shutdown handler locks `inner`, so drop the guard here to prevent deadlock
+        drop(inner);
         self.miner_shutdown.clone().send_halt().await;
     }
 
@@ -557,7 +559,7 @@ impl Monitor {
                 // drop `chain` here to drop iterator which holds immutable reference
                 // to `monitor`
                 drop(chain);
-                self.shutdown(&mut inner, reason).await;
+                self.shutdown(inner, reason).await;
                 return;
             }
             info!("chain {}: {:?}", chain.hashboard_idx, chain.state);
@@ -580,8 +582,8 @@ impl Monitor {
         info!("Monitor: {:?}", decision_explained);
         match decision_explained.decision {
             ControlDecision::Shutdown => {
-                self.shutdown(&mut inner, decision_explained.reason.into())
-                    .await;
+                self.shutdown(inner, decision_explained.reason.into()).await;
+                return;
             }
             ControlDecision::UseFixedSpeed(fan_speed) => {
                 self.set_fan_speed(&mut inner, fan_speed);
