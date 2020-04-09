@@ -27,6 +27,7 @@ import argparse
 import logging
 import colorlog
 import builder as bos_builder
+import git
 import os
 
 import builder.dodo as bos_dodo
@@ -67,6 +68,16 @@ class CommandManager:
         # change default platform in configuration
         if args.platform:
             self._config.bos.platform = args.platform
+
+        # force default branch for related repository when release branch is active
+        # this behaviour cannot be overloaded in local configuration file
+        repo_meta = git.Repo(search_parent_directories=True)
+        if not repo_meta.head.is_detached:
+            repo_branch = repo_meta.active_branch.name
+            stable_branch_name = self._config.release.begin.branch
+            if repo_branch == stable_branch_name:
+                # set all related repositories to stable branch too
+                self._config.remote.branch = stable_branch_name
 
     def _doit_prepare(self, builder, task):
         bos_dodo.builder = builder
