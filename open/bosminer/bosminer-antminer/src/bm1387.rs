@@ -604,47 +604,41 @@ impl PllTable {
         let mut freq_bins: Vec<Option<PllFrequency>> = vec![None; max_mhz + 1];
 
         // Go through all dividers
-        for postdiv1 in 1..=7 {
-            for refdiv in 1..=63 {
-                for postdiv2 in 1..=postdiv1 {
-                    for fbdiv in 32..128 {
-                        // Contruct PLL register
-                        let reg = PllReg {
-                            fbdiv,
-                            refdiv,
-                            postdiv1,
-                            postdiv2,
-                        };
-                        // Calculate frequency set by this divider
-                        let pll_freq = PllFrequency::new(reg, xtal_freq);
-                        // Round to nearest MHz to get bin number
-                        let bin_no = pll_freq.frequency.saturating_add(500_000) / Self::BIN_SIZE_HZ;
-                        if bin_no < min_mhz || bin_no > max_mhz {
-                            // Frequency out of range
-                            continue;
-                        }
-                        let bin = &mut freq_bins[bin_no];
-                        let bin_freq = bin_no * Self::BIN_SIZE_HZ;
+        for postdiv1 in (1..=7).rev() {
+            for fbdiv in 32..128 {
+                // Contruct PLL register
+                let reg = PllReg {
+                    fbdiv,
+                    refdiv: 2,
+                    postdiv1,
+                    postdiv2: 1,
+                };
+                // Calculate frequency set by this divider
+                let pll_freq = PllFrequency::new(reg, xtal_freq);
+                // Round to nearest MHz to get bin number
+                let bin_no = pll_freq.frequency.saturating_add(500_000) / Self::BIN_SIZE_HZ;
+                if bin_no < min_mhz || bin_no > max_mhz {
+                    // Frequency out of range
+                    continue;
+                }
+                let bin = &mut freq_bins[bin_no];
+                let bin_freq = bin_no * Self::BIN_SIZE_HZ;
 
-                        // Check if we can improve divider we already have
-                        if let Some(PllFrequency {
-                            frequency: old_freq,
-                            ..
-                        }) = bin.as_ref()
-                        {
-                            // There's already a PLL in this bucket
-                            if distance(bin_freq, *old_freq)
-                                <= distance(bin_freq, pll_freq.frequency)
-                            {
-                                // We are not improving the approximation, bail out
-                                continue;
-                            }
-                        }
-
-                        // Remember this divider
-                        *bin = Some(pll_freq);
+                // Check if we can improve divider we already have
+                if let Some(PllFrequency {
+                    frequency: old_freq,
+                    ..
+                }) = bin.as_ref()
+                {
+                    // There's already a PLL in this bucket
+                    if distance(bin_freq, *old_freq) <= distance(bin_freq, pll_freq.frequency) {
+                        // We are not improving the approximation, bail out
+                        continue;
                     }
                 }
+
+                // Remember this divider
+                *bin = Some(pll_freq);
             }
         }
 
