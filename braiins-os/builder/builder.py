@@ -445,6 +445,15 @@ class Builder:
                 """
                 self._format_tags[name] = value
 
+            def remove_tag(self, name):
+                """
+                Remove format tag
+
+                :param name:
+                    Name of tag.
+                """
+                del self._format_tags[name]
+
             def __call__(self, value: str) -> str:
                 """
                 Create callable object used in configuration parset for tag expansion
@@ -489,7 +498,7 @@ class Builder:
         """
         return self._config
 
-    def _run(self, *args, path=None, input=None, output=False, init=None):
+    def _run(self, *args, path=None, input=None, output=False, init=None, cwd=None):
         """
         Run system command in LEDE source directory
 
@@ -514,11 +523,13 @@ class Builder:
             If true then method returns captured stdout otherwise stdout is printed to standard output.
         :param init:
             An object to be called in the child process just before the child is executed.
+        :param cwd:
+            Path to current directory for system command. When it is None then LEDE source directory is used.
         :return:
             Captured stdout when `output` argument is set to True.
         """
         env = None
-        cwd = self._working_dir
+        cwd = cwd or self._working_dir
         stdout = subprocess.PIPE if output else None
 
         if path:
@@ -2664,6 +2675,15 @@ class Builder:
 
         # return back to active branch
         meta_active_branch.checkout()
+
+        # run user specific action when requested
+        self._config.formatter.add_tag('branch_name', branch_name)
+        action = self._config.release.freeze.get('action')
+        self._config.formatter.remove_tag('branch_name')
+
+        if action:
+            # run user action in monorepo directory
+            self._run(action.split(), cwd=self._monorepo_dir)
 
         if push:
             logging.info("Pushing '{}' branch to remote...".format(branch_name))
