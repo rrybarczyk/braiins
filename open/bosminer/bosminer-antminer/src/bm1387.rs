@@ -979,13 +979,13 @@ mod test {
         assert_eq!(lookup_one(4_000_000_000), None);
         // approximate lookups
         assert_eq!(lookup_one(216_000_000), Some(216_071_428));
-        assert_eq!(lookup_one(217_400_000), Some(217_307_692));
+        assert_eq!(lookup_one(217_400_000), Some(217857142));
         assert_eq!(lookup_one(217_700_000), Some(217_857_142));
         assert_eq!(lookup_one(1_081_250_000), Some(1_075_000_000));
         assert_eq!(lookup_one(1_081_250_001), Some(1_087_500_000));
         // exact lookups
         assert_eq!(lookup_one(650_000_000), Some(650_000_000));
-        assert_eq!(lookup_one(1_033_333_333), Some(1_033_333_333));
+        assert_eq!(lookup_one(1_037_500_000), Some(1_037_500_000));
     }
 
     #[test]

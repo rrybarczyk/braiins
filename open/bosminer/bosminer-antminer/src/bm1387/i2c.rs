@@ -192,7 +192,7 @@ impl<T: CommandInterface> i2c::Bus for Bus<T> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use bm1387::{I2cControlReg, MiscCtrlReg};
+    use bm1387::{I2cControlReg, MiscCtrlReg, Register};
     use i2c::Bus as I2cBus;
     use std::sync::Arc;
 
@@ -240,7 +240,7 @@ mod test {
     #[async_trait]
     impl<R: RegisterInterface> CommandInterface for SharedRegisterInterface<R> {
         /// Read register
-        async fn read_register<T: bm1387::Register>(
+        async fn read_register<T: Register>(
             &self,
             chip_address: ChipAddress,
         ) -> error::Result<Vec<T>> {
@@ -255,7 +255,7 @@ mod test {
         }
 
         /// Write register
-        async fn write_register<'a, T: bm1387::Register>(
+        async fn write_register<'a, T: Register>(
             &'a self,
             chip_address: ChipAddress,
             value: &'a T,
