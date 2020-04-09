@@ -532,7 +532,7 @@ pub struct PllReg {
     #[packed_field(bits = "23:16")]
     fbdiv: u8,
     /// Range: 1..=63, but in datasheet always 2
-    #[packed_field(bits = "11:8")]
+    #[packed_field(bits = "13:8")]
     refdiv: u8,
     /// Range: 1..=7
     #[packed_field(bits = "7:4")]
@@ -1020,6 +1020,22 @@ mod test {
         assert_eq!(
             CoreAddress::new(0x40e55650),
             CoreAddress { chip: 20, core: 64 }
+        );
+    }
+
+    #[test]
+    fn test_pll_divider_encoding() {
+        let reg = PllReg {
+            fbdiv: 0x78,
+            refdiv: 0x1e,
+            postdiv1: 1,
+            postdiv2: 1,
+        };
+        assert_eq!(reg.refdiv, 0x1e);
+        assert_eq!(reg.to_reg(), 0x00781e11);
+        assert_eq!(
+            PllFrequency::new(reg, DEFAULT_XTAL_FREQ).frequency,
+            100_000_000
         );
     }
 }
