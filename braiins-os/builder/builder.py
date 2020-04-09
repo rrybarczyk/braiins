@@ -535,7 +535,7 @@ class Builder:
         if output:
             return process.stdout
 
-    def get_firmware_version(self, short=False, local_time=False) -> str:
+    def get_firmware_version(self, short=False, local_time=False, show_dirty=True) -> str:
         """
         Return version name for firmware
 
@@ -547,6 +547,8 @@ class Builder:
             Return unique short version without commit suffix.
         :param local_time:
             Use local time for firmware version instead of committed date of head.
+        :param show_dirty:
+            Append dirty suffix when repository is dirty.
         :return:
             String with firmware version without 'firmware_' prefix.
         """
@@ -567,7 +569,7 @@ class Builder:
         fw_latest = next(iter(sorted(fw_tags, reverse=True)), None)
 
         commit = repo.head.object.hexsha[:8]
-        dirty = '-dirty' if repo.is_dirty() else ''
+        dirty = '-dirty' if show_dirty and repo.is_dirty() else ''
 
         if fw_latest:
             fw_patch_level, fw_commit = fw_latest[len(fw_current):].split('-', 2)[:2]
@@ -2476,11 +2478,13 @@ class Builder:
 
         if not lines[0].startswith('## '):
             logging.error("Incorrect header in '{}' file: '{}'".format(path, lines[0].strip()))
-            raise BuilderStop
+            return False
 
         with open(path, 'w') as whatsnew:
             whatsnew.write('# {}\n\n'.format(version_short))
             whatsnew.writelines(lines)
+
+        return True
 
     def patch_config_branches(self, config_original, config):
         """
@@ -2592,7 +2596,7 @@ class Builder:
                 repo.create_head(branch_name, force=force)
 
         if push:
-            logging.info("Pushing newly created branches to remote...")
+            logging.info("Pushing '{}' branches to remote...".format(branch_name))
             logging.info("- monorepo")
             repo_meta.remotes.origin.push(branch_name, force=force, set_upstream=True)
             for name, repo in self._repos.items():
@@ -2601,7 +2605,69 @@ class Builder:
                     repo.remotes.origin.push(branch_name, force=force, set_upstream=True)
 
     def _release_freeze(self, repo_meta, config_original, push, force):
-        pass
+        # save active branch to return back after creating release
+        meta_active_branch = repo_meta.active_branch
+
+        branch_name = meta_active_branch.name
+        stable_branch_name = self._config.release.begin.branch
+
+        if branch_name != stable_branch_name:
+            logging.error("Only a branch with a name '{}' can be used for freezing!".format(stable_branch_name))
+            if not force:
+                raise BuilderStop
+
+        branch_name = self._config.release.freeze.branch
+
+        logging.info("Creating new '{}' branch...".format(branch_name))
+        branch = repo_meta.create_head(branch_name, force=force)
+
+        logging.debug("Checking out '{}' branch...".format(branch_name))
+        branch.checkout()
+
+        # get short version for 'whatsnew.md' header
+        fw_version_short = self.get_firmware_version(short=True, local_time=True, show_dirty=False)
+        if self.patch_whatsnew(self.WHATS_NEW, fw_version_short):
+            # create commit with patched whatsnew file
+            # repo_meta.working_tree_dir
+            repo_meta.index.add([os.path.relpath(self.WHATS_NEW, repo_meta.working_tree_dir)])
+            repo_meta.index.commit(self.WHATS_NEW_COMMENT)
+        elif not force:
+            raise BuilderStop
+
+        # copy configuration for modifications
+        config = copy.deepcopy(config_original)
+
+        # always checkout all repositories to correct commit
+        config.remote.fetch_always = 'yes'
+
+        logging.debug("Patching repository branches in config...")
+        self.patch_config_branches(config_original, config)
+
+        logging.info("Saving default configuration file to {}...".format(self.DEFAULT_CONFIG))
+        with open(os.path.join(self.DEFAULT_CONFIG), 'w') as default_config:
+            config.dump(default_config)
+
+        logging.debug("Creating new release commit...")
+        repo_meta.index.add([os.path.relpath(self.DEFAULT_CONFIG, repo_meta.working_tree_dir)])
+        repo_meta.index.commit("Release Firmware")
+
+        fw_version_long = self.get_firmware_version(show_dirty=False)
+
+        # check if full version has the same prefix as short one
+        # it can happen when release is done just before midnight
+        if not fw_version_long.startswith(fw_version_short):
+            meta_active_branch.checkout()
+            repo_meta.head.reset('HEAD~1')
+            logging.error("Created wrong short version for '{}'".format(self.WHATS_NEW))
+            logging.warning("Try to run release script again! This happens when release is done just before midnight")
+            raise BuilderStop
+
+        # return back to active branch
+        meta_active_branch.checkout()
+
+        if push:
+            logging.info("Pushing '{}' branch to remote...".format(branch_name))
+            repo_meta.remotes.origin.push(branch_name, force=force, set_upstream=True)
 
     def _release_end(self, repo_meta, config_original, push, force):
         pass
