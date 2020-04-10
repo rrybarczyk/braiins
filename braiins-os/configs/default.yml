@@ -241,7 +241,8 @@ deploy:
     password:
 
 release:
-  begin:
-    branch: bos-stable
-  freeze:
-    branch: bos-release
+  branch:
+    devel: bos-devel
+    stable: bos-stable
+    release: bos-release
+    whatsnew: bos-devel-whatsnew

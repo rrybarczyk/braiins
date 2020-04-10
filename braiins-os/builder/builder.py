@@ -2584,7 +2584,7 @@ class Builder:
         :param push:
             Push all changes to upstream.
         """
-        branch_name = self._config.release.begin.branch
+        branch_name = self._config.release.branch.stable
 
         if self._has_branch(repo_meta, branch_name):
             logging.error("Branch '{}' already exists!".format(branch_name))
@@ -2620,14 +2620,19 @@ class Builder:
         meta_active_branch = repo_meta.active_branch
 
         branch_name = meta_active_branch.name
-        stable_branch_name = self._config.release.begin.branch
+        stable_branch_name = self._config.release.branch.stable
 
         if branch_name != stable_branch_name:
             logging.error("Only a branch with a name '{}' can be used for freezing!".format(stable_branch_name))
             if not force:
                 raise BuilderStop
 
-        branch_name = self._config.release.freeze.branch
+        branch_name = self._config.release.branch.release
+
+        if self._has_branch(repo_meta, branch_name):
+            logging.error("Branch '{}' already exists!".format(branch_name))
+            if not force:
+                raise BuilderStop
 
         logging.info("Creating new '{}' branch...".format(branch_name))
         branch = repo_meta.create_head(branch_name, force=force)
@@ -2678,7 +2683,7 @@ class Builder:
 
         # run user specific action when requested
         self._config.formatter.add_tag('branch_name', branch_name)
-        action = self._config.release.freeze.get('action')
+        action = self._config.release.get('action.freeze')
         self._config.formatter.remove_tag('branch_name')
 
         if action:
@@ -2690,7 +2695,70 @@ class Builder:
             repo_meta.remotes.origin.push(branch_name, force=force, set_upstream=True)
 
     def _release_end(self, repo_meta, config_original, push, force):
-        pass
+        # save active branch to return back after creating release
+        meta_active_branch = repo_meta.active_branch
+
+        branch_name = meta_active_branch.name
+        devel_branch_name = self._config.release.branch.devel
+
+        if branch_name != devel_branch_name:
+            logging.error("Only a branch with a name '{}' can be used for ending release!".format(devel_branch_name))
+            if not force:
+                raise BuilderStop
+
+        stable_branch_name = self._config.release.branch.stable
+        release_branch_name = self._config.release.branch.release
+        whatsnew_branch_name = self._config.release.branch.whatsnew
+
+        logging.info("Creating new '{}' branch...".format(whatsnew_branch_name))
+        whatsnew_branch = repo_meta.create_head(whatsnew_branch_name, force=force)
+
+        # switch to release branch
+        repo_meta.heads[release_branch_name].checkout()
+
+        fw_version_long = self.get_firmware_version(show_dirty=False)
+        fw_version_tag = '{}_{}'.format(self.FEED_FIRMWARE, fw_version_long)
+
+        logging.info("Creating new release tag '{}'...".format(fw_version_tag))
+        repo_meta.create_tag(fw_version_tag, force=force)
+
+        # switch to whatsnew branch where will be patched whatsnew file
+        whatsnew_branch.checkout()
+
+        # path whatsnew file with long firmware version in devel branch
+        # it differs from release branch where it cannot be done because version contains release commit
+        # but whatsnew versions for older firmwares is faxed in next release
+        if self.patch_whatsnew(self.WHATS_NEW, fw_version_long):
+            # create commit with patched whatsnew file
+            # repo_meta.working_tree_dir
+            repo_meta.index.add([os.path.relpath(self.WHATS_NEW, repo_meta.working_tree_dir)])
+            repo_meta.index.commit(self.WHATS_NEW_COMMENT)
+        elif not force:
+            raise BuilderStop
+
+        # return back to active branch
+        meta_active_branch.checkout()
+
+        if push:
+            logging.info("Pushing '{}' tag to remote...".format(fw_version_tag))
+            # push teg for new firmware release
+            repo_meta.remotes.origin.push(fw_version_tag, force=force)
+            # delete all remote release branches
+            logging.info("Pushing '{}' branch...".format(whatsnew_branch_name))
+            repo_meta.remotes.origin.push(whatsnew_branch_name, force=force, set_upstream=True)
+            logging.info("Deleting remote '{}' branch...".format(stable_branch_name))
+            repo_meta.remotes.origin.push(stable_branch_name, force=force, delete=True)
+            logging.info("Deleting remote '{}' branch...".format(release_branch_name))
+            repo_meta.remotes.origin.push(release_branch_name, force=force, delete=True)
+            # delete all local release branches
+            repo_meta.delete_head(stable_branch_name, force=True)
+            repo_meta.delete_head(release_branch_name, force=True)
+            logging.info("Deleting remaining remote '{}' branches...".format(stable_branch_name))
+            for name, repo in self._repos.items():
+                if not repo.head.is_detached:
+                    logging.info("- {}".format(name))
+                    repo.remotes.origin.push(stable_branch_name, force=force, delete=True)
+                    repo.delete_head(stable_branch_name, force=True)
 
     def release(self, stage, config_original, push=True, force=False):
         """

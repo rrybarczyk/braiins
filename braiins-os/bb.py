@@ -74,7 +74,7 @@ class CommandManager:
         repo_meta = git.Repo(search_parent_directories=True)
         if not repo_meta.head.is_detached:
             repo_branch = repo_meta.active_branch.name
-            stable_branch_name = self._config.release.begin.branch
+            stable_branch_name = self._config.release.branch.stable
             if repo_branch == stable_branch_name:
                 # set all related repositories to stable branch too
                 self._config.remote.branch = stable_branch_name
