@@ -248,3 +248,6 @@ release:
     stable: bos-stable
     release: bos-release
     whatsnew: bos-devel-whatsnew
+  version_suffix:
+    stable: -stable
+    release:

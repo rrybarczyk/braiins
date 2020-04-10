@@ -546,11 +546,11 @@ class Builder:
         if output:
             return process.stdout
 
-    def get_firmware_version(self, short=False, local_time=False, show_dirty=True) -> str:
+    def get_firmware_version(self, short=False, local_time=False, show_dirty=True, suffix=None) -> str:
         """
         Return version name for firmware
 
-        The firmware version is in a form 'firmware_<date>-<patch_level>-<lede_commit>(-dirty)'
+        The firmware version is in a form 'firmware_<date>-<patch_level>-<lede_commit>(-dirty)<suffix>'
         The patch level is incremented when several firmwares have beenRemoteWalker released in the same day.
         The current firmware version is get from git tag which is created when release is done.
 
@@ -560,6 +560,8 @@ class Builder:
             Use local time for firmware version instead of committed date of head.
         :param show_dirty:
             Append dirty suffix when repository is dirty.
+        :param suffix:
+            Value of firmware version suffix or None for default behaviour.
         :return:
             String with firmware version without 'firmware_' prefix.
         """
@@ -581,7 +583,7 @@ class Builder:
 
         commit = repo.head.object.hexsha[:8]
         dirty = '-dirty' if show_dirty and repo.is_dirty() else ''
-        suffix = self._config.build.get('version_suffix', '')
+        suffix = self._config.build.get('version_suffix', '') if suffix is None else ''
 
         if fw_latest:
             fw_patch_level, fw_commit = fw_latest[len(fw_current):].split('-', 2)[:2]
@@ -2565,6 +2567,30 @@ class Builder:
                 config.remote.repos.get(name).match.get(pattern).branch = commit_sha
 
     @staticmethod
+    def patch_version_suffix(config, version_suffix):
+        """
+        Patch original configuration with new build version suffix
+
+        :param config:
+            Configuration tree used for changes.
+        :param version_suffix:
+            Value of new build version suffix.
+            `None` effectively deletes the attribute.
+        :return:
+            Return `True` when config has been changed.
+        """
+        differs = config.build.get('version_suffix') != version_suffix
+
+        if differs:
+            # patch the value only if it differs from previous value
+            if version_suffix:
+                config.build.version_suffix = version_suffix
+            else:
+                del config.build.version_suffix
+
+        return differs
+
+    @staticmethod
     def _has_branch(repo, branch_name, remotes=True):
         if branch_name in repo.heads:
             return True
@@ -2585,6 +2611,9 @@ class Builder:
         :param push:
             Push all changes to upstream.
         """
+        # save active branch to return back after creating release
+        meta_active_branch = repo_meta.active_branch
+
         branch_name = self._config.release.branch.stable
 
         if self._has_branch(repo_meta, branch_name):
@@ -2600,12 +2629,32 @@ class Builder:
 
         logging.info("Creating new '{}' branches...".format(branch_name))
         logging.info("- monorepo")
-        repo_meta.create_head(branch_name, force=force)
+        stable_branch = repo_meta.create_head(branch_name, force=force)
         for name, repo in self._repos.items():
             # do not create new branch for repositories checked out on specific commit
             if not repo.head.is_detached:
                 logging.info("- {}".format(name))
                 repo.create_head(branch_name, force=force)
+
+        # copy configuration for modifications
+        config = copy.deepcopy(config_original)
+        stable_suffix = self._config.release.get('version_suffix.stable')
+
+        logging.debug("Patching build version suffix...")
+        if self.patch_version_suffix(config, stable_suffix):
+            # create commit on new release branch
+            stable_branch.checkout()
+
+            logging.info("Saving default configuration file to {}...".format(self.DEFAULT_CONFIG))
+            with open(os.path.join(self.DEFAULT_CONFIG), 'w') as default_config:
+                config.dump(default_config)
+
+            logging.debug("Creating new release commit...")
+            repo_meta.index.add([os.path.relpath(self.DEFAULT_CONFIG, repo_meta.working_tree_dir)])
+            repo_meta.index.commit("Set build version suffix for stable release")
+
+            # return back to active branch
+            meta_active_branch.checkout()
 
         if push:
             logging.info("Pushing '{}' branches to remote...".format(branch_name))
@@ -2641,8 +2690,11 @@ class Builder:
         logging.debug("Checking out '{}' branch...".format(branch_name))
         branch.checkout()
 
+        release_suffix = self._config.release.get('version_suffix.release', '')
+
         # get short version for 'whatsnew.md' header
-        fw_version_short = self.get_firmware_version(short=True, local_time=True, show_dirty=False)
+        fw_version_short = self.get_firmware_version(short=True, local_time=True, show_dirty=False,
+                                                     suffix=release_suffix)
         if self.patch_whatsnew(self.WHATS_NEW, fw_version_short):
             # create commit with patched whatsnew file
             # repo_meta.working_tree_dir
@@ -2657,6 +2709,9 @@ class Builder:
         # always checkout all repositories to correct commit
         config.remote.fetch_always = 'yes'
 
+        logging.debug("Patching build version suffix...")
+        self.patch_version_suffix(config, release_suffix)
+
         logging.debug("Patching repository branches in config...")
         self.patch_config_branches(config_original, config)
 
@@ -2668,11 +2723,11 @@ class Builder:
         repo_meta.index.add([os.path.relpath(self.DEFAULT_CONFIG, repo_meta.working_tree_dir)])
         repo_meta.index.commit("Release Firmware")
 
-        fw_version_long = self.get_firmware_version(show_dirty=False)
+        fw_version_long = self.get_firmware_version(show_dirty=False, suffix=release_suffix)
 
         # check if full version has the same prefix as short one
         # it can happen when release is done just before midnight
-        if not fw_version_long.startswith(fw_version_short):
+        if fw_version_long.split('-')[:4] != fw_version_short.split('-')[:4]:
             meta_active_branch.checkout()
             repo_meta.head.reset('HEAD~1')
             logging.error("Created wrong short version for '{}'".format(self.WHATS_NEW))
@@ -2698,18 +2753,22 @@ class Builder:
     def _release_end(self, repo_meta, config_original, push, force):
         # save active branch to return back after creating release
         meta_active_branch = repo_meta.active_branch
-
         branch_name = meta_active_branch.name
+
         devel_branch_name = self._config.release.branch.devel
+        stable_branch_name = self._config.release.branch.stable
+        release_branch_name = self._config.release.branch.release
+        whatsnew_branch_name = self._config.release.branch.whatsnew
 
         if branch_name != devel_branch_name:
             logging.error("Only a branch with a name '{}' can be used for ending release!".format(devel_branch_name))
             if not force:
                 raise BuilderStop
 
-        stable_branch_name = self._config.release.branch.stable
-        release_branch_name = self._config.release.branch.release
-        whatsnew_branch_name = self._config.release.branch.whatsnew
+        if self._has_branch(repo_meta, whatsnew_branch_name):
+            logging.error("Branch '{}' already exists!".format(whatsnew_branch_name))
+            if not force:
+                raise BuilderStop
 
         logging.info("Creating new '{}' branch...".format(whatsnew_branch_name))
         whatsnew_branch = repo_meta.create_head(whatsnew_branch_name, force=force)
@@ -2717,7 +2776,11 @@ class Builder:
         # switch to release branch
         repo_meta.heads[release_branch_name].checkout()
 
-        fw_version_long = self.get_firmware_version(show_dirty=False)
+        # get release build version suffix
+        release_config = load_config(self.DEFAULT_CONFIG)
+        release_suffix = release_config.release.get('version_suffix.release', '')
+
+        fw_version_long = self.get_firmware_version(show_dirty=False, suffix=release_suffix)
         fw_version_tag = '{}_{}'.format(self.FEED_FIRMWARE, fw_version_long)
 
         logging.info("Creating new release tag '{}'...".format(fw_version_tag))
