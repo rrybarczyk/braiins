@@ -35,6 +35,8 @@ net:
 build:
   # name of subdirectory in the build directory
   name: '{target}'
+  # suffix added to firmware version
+  version_suffix: -nightly
   # file with default OpenWrt configuration
   config: defaults/release.conf
   # file with list of packages for build images

@@ -581,6 +581,7 @@ class Builder:
 
         commit = repo.head.object.hexsha[:8]
         dirty = '-dirty' if show_dirty and repo.is_dirty() else ''
+        suffix = self._config.build.get('version_suffix', '')
 
         if fw_latest:
             fw_patch_level, fw_commit = fw_latest[len(fw_current):].split('-', 2)[:2]
@@ -593,7 +594,7 @@ class Builder:
             patch_level = 0
 
         prefix = '{:%Y-%m-%d}-{}'.format(commit_time, patch_level)
-        return '{}{}'.format(prefix, dirty) if short else '{}-{}{}'.format(prefix, commit, dirty)
+        return '{}{}{}'.format(prefix, dirty, suffix) if short else '{}-{}{}{}'.format(prefix, commit, dirty, suffix)
 
     def _get_repo(self, name: str) -> git.Repo:
         """
