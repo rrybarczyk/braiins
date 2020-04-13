@@ -92,7 +92,7 @@ if [ ! -f "$${BOS_FEEDS}" ]; then
 fi
 
 # parse server address from opkg configuration file
-feeds_server=$$(awk '/'$${BOS_FEEDS_RECORD}'/ {print $$3}' "$${BOS_FEEDS}")
+feeds_server=$$(awk '/^[^#]/ && $$2 ~ /^'$${BOS_FEEDS_RECORD}'$$/ {print $$3}' "$${BOS_FEEDS}" | tail -n1)
 
 if [ -z "$${feeds_server}" ]; then
 	echo "Cannot find feeds server in $${BOS_FEEDS}!" >&2
