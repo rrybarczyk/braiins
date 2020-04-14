@@ -29,8 +29,13 @@ PKG_MAINTAINER:=Braiins <braiins@braiins.com>
 # set firmware version
 PKG_RELEASE:=$(call qstrip,$(CONFIG_FIRMWARE_VERSION))
 
+BOS_FEEDS_CONFIG_RECORD:=$(call qstrip,$(CONFIG_FIRMWARE_FEEDS_RECORD))
+BOS_FEEDS_CONFIG:=/etc/opkg/$(call qstrip,$(CONFIG_FIRMWARE_FEEDS_CONFIG)).conf
 BOS_FEEDS_SERVER:=$(call qstrip,$(CONFIG_FIRMWARE_FEEDS_SERVER))/$(SUBTARGET)
-BOS_FEEDS_CONFIG:=/etc/opkg/bosfeeds.conf
+
+# special custom configuration file which is kept during sysupgrade
+BOS_CUSTOM_FEEDS_CONFIG:=/etc/opkg/$(call qstrip,$(CONFIG_FIRMWARE_CUSTOM_FEEDS_CONFIG)).conf
+BOS_CUSTOM_FEEDS_SERVER:=$(call qstrip,$(CONFIG_FIRMWARE_CUSTOM_FEEDS_SERVER))/$(SUBTARGET)
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -48,6 +53,10 @@ define Package/firmware/config
 	source "$(SOURCE)/Config.in"
 endef
 
+define Package/firmware/conffiles
+$(BOS_CUSTOM_FEEDS_CONFIG)
+endef
+
 define Build/Compile
 endef
 
@@ -55,7 +64,10 @@ define Package/firmware/install
 	$(INSTALL_DIR) $(1)/etc
 	$(INSTALL_CONF) ./files/fw_info.json $(1)/etc/
 	$(INSTALL_DIR) $(1)/etc/opkg
-	echo "src/gz bos_firmware $(BOS_FEEDS_SERVER)" > $(1)$(BOS_FEEDS_CONFIG)
+	$(INSTALL_CONF) ./files/customfeeds.conf $(1)$(BOS_CUSTOM_FEEDS_CONFIG)
+	echo "$(BOS_FEEDS_SERVER)" > $(1)$(BOS_FEEDS_CONFIG)
+	$(SED) 's#{CUSTOM_FEED}#'"$(BOS_CUSTOM_FEEDS_SERVER)"'#g' \
+		$(1)$(BOS_CUSTOM_FEEDS_CONFIG)
 endef
 
 define Package/firmware/preinst
@@ -77,7 +89,7 @@ PACKAGES_NAME="Packages"
 PACKAGES_PATH="/tmp/$${PACKAGES_NAME}"
 SYSUPGRADE_PATH="/tmp/sysupgrade.tar"
 BOS_FEEDS="$(BOS_FEEDS_CONFIG)"
-BOS_FEEDS_RECORD="bos_firmware"
+BOS_FEEDS_RECORD="$(BOS_FEEDS_CONFIG_RECORD)"
 FIRMWARE_NAME="$(PKG_NAME)_$(VERSION)_$(PKGARCH).tar"
 FIRMWARE_REQUIRE="$(call qstrip,$(CONFIG_FIRMWARE_REQUIRE))"
 
@@ -92,10 +104,10 @@ if [ ! -f "$${BOS_FEEDS}" ]; then
 fi
 
 # parse server address from opkg configuration file
-feeds_server=$$(awk '/^[^#]/ && $$2 ~ /^'$${BOS_FEEDS_RECORD}'$$/ {print $$3}' "$${BOS_FEEDS}" | tail -n1)
+feeds_server=$$(awk '/^[^#]/ && $$2 ~ /^'$${BOS_FEEDS_RECORD}'$$/ {print $$3}' /etc/opkg/*.conf | tail -n1)
 
 if [ -z "$${feeds_server}" ]; then
-	echo "Cannot find feeds server in $${BOS_FEEDS}!" >&2
+	echo "Cannot find feeds server in '/etc/opkg/' configuration files!" >&2
 	echo "Configuration with '$${BOS_FEEDS_RECORD}' is probably missing." >&2
 	exit 1
 fi
