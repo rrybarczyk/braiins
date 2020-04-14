@@ -24,6 +24,7 @@ pub mod command;
 pub mod i2c;
 
 use crate::error::{self, ErrorKind};
+use crate::utils::distance;
 
 use packed_struct::prelude::*;
 use packed_struct_codegen::PackedStruct;
@@ -530,30 +531,21 @@ impl Register for MiscCtrlReg {
 pub struct PllReg {
     /// Range: 60..=320, but in datasheet table: 32..=128
     #[packed_field(bits = "23:16")]
-    fbdiv: u8,
+    pub fbdiv: u8,
     /// Range: 1..=63, but in datasheet always 2
     #[packed_field(bits = "13:8")]
-    refdiv: u8,
+    pub refdiv: u8,
     /// Range: 1..=7
     #[packed_field(bits = "7:4")]
-    postdiv1: u8,
+    pub postdiv1: u8,
     /// Range: 1..=7, but in datasheet always 1
     /// Also must hold: postdiv2 <= postdiv1
     #[packed_field(bits = "3:0")]
-    postdiv2: u8,
+    pub postdiv2: u8,
 }
 
 impl Register for PllReg {
     const REG_NUM: u8 = 0x0c;
-}
-
-// compute distance between two usizes
-fn distance(x: usize, y: usize) -> usize {
-    if x >= y {
-        x - y
-    } else {
-        y - x
-    }
 }
 
 /// Represents PLL divider and associated frequency computed at some crystal speed (which is
@@ -589,63 +581,38 @@ pub struct PllTable {
     table: Vec<PllFrequency>,
 }
 
+pub const BM1387_FACTORY_DIVIDERS: &[u32] = &[
+    0x200241, 0x280241, 0x300241, 0x380241, 0x400241, 0x480241, 0x500241, 0x580241, 0x600241,
+    0x680241, 0x700241, 0x780241, 0x800241, 0x610231, 0x410221, 0x620231, 0x420221, 0x640231,
+    0x430221, 0x650231, 0x440221, 0x670231, 0x450221, 0x680231, 0x460221, 0x6a0231, 0x470221,
+    0x6b0231, 0x480221, 0x6d0231, 0x490221, 0x6e0231, 0x4a0221, 0x700231, 0x4b0221, 0x710231,
+    0x4c0221, 0x730231, 0x4d0221, 0x740231, 0x4e0221, 0x760231, 0x4f0221, 0x770231, 0x500221,
+    0x790231, 0x510221, 0x7a0231, 0x520221, 0x7c0231, 0x530221, 0x7d0231, 0x540221, 0x7f0231,
+    0x550221, 0x800231, 0x560221, 0x570221, 0x580221, 0x590221, 0x5a0221, 0x5b0221, 0x5c0221,
+    0x5d0221, 0x5e0221, 0x5f0221, 0x600221, 0x610221, 0x620221, 0x630221, 0x640221, 0x650221,
+    0x660221, 0x670221, 0x680221, 0x690221, 0x6a0221, 0x6b0221, 0x6c0221, 0x6d0221, 0x6e0221,
+    0x6f0221, 0x700221, 0x710221, 0x720221, 0x730221, 0x740221, 0x750221, 0x760221, 0x770221,
+    0x780221, 0x790221, 0x7a0221, 0x7b0221, 0x7c0221, 0x7d0221, 0x7e0221, 0x7f0221, 0x800221,
+    0x420211, 0x440211, 0x460211, 0x480211, 0x4a0211, 0x4c0211, 0x4e0211, 0x500211, 0x520211,
+    0x540211, 0x560211, 0x580211, 0x5a0211, 0x5c0211, 0x5e0211,
+];
+
 impl PllTable {
-    /// Minimum and maximum supported frequency
-    const MIN_FREQ_HZ: usize = 100_000_000;
-    const MAX_FREQ_HZ: usize = 1_200_000_000;
-    const BIN_SIZE_HZ: usize = 1_000_000;
-
-    /// Precompute divider table (which sorted list of frequencies and corresponding dividers)
-    pub fn build(xtal_freq: usize) -> Self {
-        let min_mhz = Self::MIN_FREQ_HZ / Self::BIN_SIZE_HZ;
-        let max_mhz = Self::MAX_FREQ_HZ / Self::BIN_SIZE_HZ;
-        // One bin for each MHz in the range [0; MAX_MHZ].
-        // Each bin contains either nothing or the best approximation found so far.
-        let mut freq_bins: Vec<Option<PllFrequency>> = vec![None; max_mhz + 1];
-
-        // Go through all dividers
-        for postdiv1 in (1..=7).rev() {
-            for fbdiv in 32..128 {
-                // Contruct PLL register
-                let reg = PllReg {
-                    fbdiv,
-                    refdiv: 2,
-                    postdiv1,
-                    postdiv2: 1,
-                };
-                // Calculate frequency set by this divider
-                let pll_freq = PllFrequency::new(reg, xtal_freq);
-                // Round to nearest MHz to get bin number
-                let bin_no = pll_freq.frequency.saturating_add(500_000) / Self::BIN_SIZE_HZ;
-                if bin_no < min_mhz || bin_no > max_mhz {
-                    // Frequency out of range
-                    continue;
-                }
-                let bin = &mut freq_bins[bin_no];
-                let bin_freq = bin_no * Self::BIN_SIZE_HZ;
-
-                // Check if we can improve divider we already have
-                if let Some(PllFrequency {
-                    frequency: old_freq,
-                    ..
-                }) = bin.as_ref()
-                {
-                    // There's already a PLL in this bucket
-                    if distance(bin_freq, *old_freq) <= distance(bin_freq, pll_freq.frequency) {
-                        // We are not improving the approximation, bail out
-                        continue;
-                    }
-                }
-
-                // Remember this divider
-                *bin = Some(pll_freq);
-            }
-        }
-
-        // Filter out all the bins that are empty and calculate frequency
-        let table = freq_bins.drain(..).filter_map(|x| x).collect::<Vec<_>>();
-
+    pub fn new(xtal_freq: usize, table: Vec<PllFrequency>) -> Self {
         Self { table, xtal_freq }
+    }
+
+    /// Build lookup table from factory dividers
+    pub fn build_pll_table(xtal_freq: usize) -> Self {
+        // Factory table was computed for 25 MHz clock frequency
+        assert_eq!(xtal_freq, 25_000_000);
+        let mut table = BM1387_FACTORY_DIVIDERS
+            .iter()
+            .map(|&reg_val| PllFrequency::new(PllReg::from_reg(reg_val), xtal_freq))
+            .collect::<Vec<_>>();
+        table.sort_by(|a, b| a.frequency.cmp(&b.frequency));
+
+        Self::new(xtal_freq, table)
     }
 
     /// Lookup best divider from a precomputed table
@@ -951,8 +918,7 @@ mod test {
         try_one_divider(1175_000_000, 0x5e0211, 0x5e, 2, 1, 1);
     }
 
-    fn lookup_one(freq: usize) -> Option<usize> {
-        let table = PllTable::build(DEFAULT_XTAL_FREQ);
+    fn lookup_one(table: &PllTable, freq: usize) -> Option<usize> {
         if let Ok(PllFrequency { frequency, reg }) = table.lookup(freq) {
             // found frequency and PLL register have to match
             assert_eq!(
@@ -967,25 +933,26 @@ mod test {
 
     #[test]
     fn test_pll_search() {
+        let table = PllTable::build_pll_table(DEFAULT_XTAL_FREQ);
+
         // boundary conditions
-        assert_eq!(lookup_one(100_000_000), Some(100_000_000));
-        assert_eq!(lookup_one(1_200_000_000), Some(1_200_000_000));
+        assert_eq!(lookup_one(&table, 100_000_000), Some(100_000_000));
+        assert_eq!(lookup_one(&table, 1_175_000_000), Some(1_175_000_000));
         // should fail: too low
-        assert_eq!(lookup_one(0), None);
-        assert_eq!(lookup_one(50_000_000), None);
-        assert_eq!(lookup_one(99_999_999), None);
+        assert_eq!(lookup_one(&table, 0), None);
+        assert_eq!(lookup_one(&table, 50_000_000), None);
+        assert_eq!(lookup_one(&table, 99_999_999), None);
         // should fail: too high
-        assert_eq!(lookup_one(1_200_000_001), None);
-        assert_eq!(lookup_one(4_000_000_000), None);
+        assert_eq!(lookup_one(&table, 1_175_000_001), None);
+        assert_eq!(lookup_one(&table, 4_000_000_000), None);
+
         // approximate lookups
-        assert_eq!(lookup_one(216_000_000), Some(216_071_428));
-        assert_eq!(lookup_one(217_400_000), Some(217857142));
-        assert_eq!(lookup_one(217_700_000), Some(217_857_142));
-        assert_eq!(lookup_one(1_081_250_000), Some(1_075_000_000));
-        assert_eq!(lookup_one(1_081_250_001), Some(1_087_500_000));
+        assert_eq!(lookup_one(&table, 703_125_000), Some(700_000_000));
+        assert_eq!(lookup_one(&table, 703_125_001), Some(706_250_000));
+
         // exact lookups
-        assert_eq!(lookup_one(650_000_000), Some(650_000_000));
-        assert_eq!(lookup_one(1_037_500_000), Some(1_037_500_000));
+        assert_eq!(lookup_one(&table, 650_000_000), Some(650_000_000));
+        assert_eq!(lookup_one(&table, 1_025_000_000), Some(1025000000));
     }
 
     #[test]

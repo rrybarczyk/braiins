@@ -60,7 +60,7 @@ use crate::power;
 use crate::registry;
 use crate::utils;
 
-use once_cell::sync::Lazy;
+use once_cell::sync::OnceCell;
 
 /// Import traits
 use command::Interface;
@@ -96,8 +96,7 @@ const CORE_ADR_SPACE_SIZE: usize = 128;
 const HALT_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Pre-computed PLL for quick lookup
-pub static PRECOMPUTED_PLL: Lazy<bm1387::PllTable> =
-    Lazy::new(|| bm1387::PllTable::build(CHIP_OSC_CLK_HZ));
+pub static PRECOMPUTED_PLL: OnceCell<bm1387::PllTable> = OnceCell::new();
 
 /// Type representing plug pin
 #[derive(Clone)]
@@ -303,6 +302,9 @@ impl HashChain {
                 "not present".to_string(),
             ))?
         }
+
+        // Precompute dividers, but do it just once
+        PRECOMPUTED_PLL.get_or_init(|| bm1387::PllTable::build_pll_table(CHIP_OSC_CLK_HZ));
 
         // create temperature sending channel
         let (temperature_sender, temperature_receiver) = watch::channel(None);
@@ -582,7 +584,10 @@ impl HashChain {
     /// WARNING: you have to take care of `set_work_time` yourself
     async fn set_chip_pll(&self, chip_addr: ChipAddress, freq: usize) -> error::Result<()> {
         // convert frequency to PLL setting register
-        let pll = PRECOMPUTED_PLL.lookup(freq)?;
+        let pll = PRECOMPUTED_PLL
+            .get()
+            .expect("BUG: PLL table not initialized")
+            .lookup(freq)?;
 
         info!(
             "chain {}: setting frequency {} MHz on {:?} (error {} MHz)",

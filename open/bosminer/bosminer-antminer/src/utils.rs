@@ -81,6 +81,15 @@ where
     }
 }
 
+// compute distance between two usizes
+pub fn distance(x: usize, y: usize) -> usize {
+    if x >= y {
+        x - y
+    } else {
+        y - x
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
