@@ -325,6 +325,21 @@ class Builder:
         logging.debug("Set required firmware version to '{}'".format(fw_require))
         stream.write('{}="{}"\n'.format(config, fw_require))
 
+    def _write_firmware_feeds_record(self, stream, config):
+        """
+        Write name of feeds record for current firmware
+
+        :param stream:
+            Opened stream for writing configuration.
+        :param config:
+            Configuration name prefix.
+        :return:
+            Name of feeds record for current firmware.
+        """
+        feeds_record = self._config.build.feeds_record
+        logging.debug("Set firmware feeds record to '{}'".format(feeds_record))
+        stream.write('{}="{}"\n'.format(config, feeds_record))
+
     def _write_external_path(self, stream, config, repo_name: str, name: str):
         """
         Write absolute path to external directory of corespondent repository
@@ -369,6 +384,7 @@ class Builder:
         ('CONFIG_FIRMWARE_MAJOR', _write_firmware_major),
         ('CONFIG_FIRMWARE_VERSION', _write_firmware_version),
         ('CONFIG_FIRMWARE_REQUIRE', _write_firmware_require),
+        ('CONFIG_FIRMWARE_FEEDS_RECORD', _write_firmware_feeds_record),
         # remove all commented CONFIG_TARGET_
         ('# CONFIG_TARGET_', None)
     ]
@@ -2591,6 +2607,30 @@ class Builder:
         return differs
 
     @staticmethod
+    def patch_feeds_record(config, feeds_record):
+        """
+        Patch original configuration with new feeds record
+
+        :param config:
+            Configuration tree used for changes.
+        :param feeds_record:
+            Value of new feeds record.
+            `None` effectively deletes the attribute.
+        :return:
+            Return `True` when config has been changed.
+        """
+        differs = feeds_record and config.build.get('feeds_record') != feeds_record
+
+        if differs:
+            # patch the value only if it differs from previous value
+            if feeds_record:
+                config.build.feeds_record = feeds_record
+            else:
+                del config.build.feeds_record
+
+        return differs
+
+    @staticmethod
     def _has_branch(repo, branch_name, remotes=True):
         if branch_name in repo.heads:
             return True
@@ -2638,10 +2678,16 @@ class Builder:
 
         # copy configuration for modifications
         config = copy.deepcopy(config_original)
+
         stable_suffix = self._config.release.get('version_suffix.stable')
+        stable_feeds_record = self._config.release.get('feeds_record.stable')
 
         logging.debug("Patching build version suffix...")
-        if self.patch_version_suffix(config, stable_suffix):
+        patched_version_suffix = self.patch_version_suffix(config, stable_suffix)
+        logging.debug("Patching build feeds record...")
+        patched_feeds_record = self.patch_feeds_record(config, stable_feeds_record)
+
+        if patched_version_suffix or patched_feeds_record:
             # create commit on new release branch
             stable_branch.checkout()
 
@@ -2651,7 +2697,12 @@ class Builder:
 
             logging.debug("Creating new release commit...")
             repo_meta.index.add([os.path.relpath(self.DEFAULT_CONFIG, repo_meta.working_tree_dir)])
-            repo_meta.index.commit("Set build version suffix for stable release")
+            if patched_version_suffix and patched_feeds_record:
+                repo_meta.index.commit("Set build version suffix and feeds record for stable release")
+            elif patched_version_suffix:
+                repo_meta.index.commit("Set build version suffix for stable release")
+            elif patched_feeds_record:
+                repo_meta.index.commit("Set build feeds record for stable release")
 
             # return back to active branch
             meta_active_branch.checkout()
@@ -2691,6 +2742,7 @@ class Builder:
         branch.checkout()
 
         release_suffix = self._config.release.get('version_suffix.release', '')
+        release_feeds_record = self._config.release.get('feeds_record.release')
 
         # get short version for 'whatsnew.md' header
         fw_version_short = self.get_firmware_version(short=True, local_time=True, show_dirty=False,
@@ -2711,6 +2763,8 @@ class Builder:
 
         logging.debug("Patching build version suffix...")
         self.patch_version_suffix(config, release_suffix)
+        logging.debug("Patching build feeds record...")
+        self.patch_feeds_record(config, release_feeds_record)
 
         logging.debug("Patching repository branches in config...")
         self.patch_config_branches(config_original, config)

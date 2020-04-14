@@ -37,6 +37,8 @@ build:
   name: '{target}'
   # suffix added to firmware version
   version_suffix: -nightly
+  # record used in feeds to distinguish current build
+  feeds_record: bos_firmware_nightly
   # file with default OpenWrt configuration
   config: defaults/release.conf
   # file with list of packages for build images
@@ -251,3 +253,6 @@ release:
   version_suffix:
     stable: -stable
     release:
+  feeds_record:
+    stable: bos_firmware_rc
+    release: bos_firmware
