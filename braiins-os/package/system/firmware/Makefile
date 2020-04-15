@@ -64,17 +64,21 @@ define Package/firmware/install
 	$(INSTALL_DIR) $(1)/etc
 	$(INSTALL_CONF) ./files/fw_info.json $(1)/etc/
 	$(INSTALL_DIR) $(1)/etc/opkg
-	$(INSTALL_CONF) ./files/customfeeds.conf $(1)$(BOS_CUSTOM_FEEDS_CONFIG)
-	echo "$(BOS_FEEDS_SERVER)" > $(1)$(BOS_FEEDS_CONFIG)
-	$(SED) 's#{CUSTOM_FEED}#'"$(BOS_CUSTOM_FEEDS_SERVER)"'#g' \
-		$(1)$(BOS_CUSTOM_FEEDS_CONFIG)
 endef
 
 define Package/firmware/preinst
 #!/bin/sh
 
-# if run within buildroot exit
-[ -n "$${IPKG_INSTROOT}" ] && exit 0
+# if run within buildroot create default configs and exit
+if [ -n "$${IPKG_INSTROOT}" ]; then
+	echo "$(BOS_FEEDS_SERVER)" > $${IPKG_INSTROOT}$(BOS_FEEDS_CONFIG)
+	cat > "$${IPKG_INSTROOT}$(BOS_CUSTOM_FEEDS_CONFIG)" <<-END
+		# add your custom package feeds here
+		#
+		# $(BOS_CUSTOM_FEEDS_SERVER)
+	END
+	exit 0
+fi
 
 # ensure compatibility with old firmwares which does not have bos_mode marker
 # moreover, old firmware has package installed only in NAND mode
