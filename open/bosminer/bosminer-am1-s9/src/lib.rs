@@ -60,7 +60,7 @@ use std::sync::{Arc, Mutex as StdMutex};
 use std::time::{Duration, Instant};
 
 use futures::channel::mpsc;
-use futures::lock::{Mutex, MutexGuard};
+use futures::lock::Mutex;
 use futures::stream::StreamExt;
 use ii_async_compat::futures;
 
@@ -80,25 +80,54 @@ const HALT_TIMEOUT: Duration = Duration::from_secs(30);
 /// TODO: Implement it as a proper type (not just alias)
 pub type Power = usize;
 
+/// Token is type that represents exclusive access to the Manager. When token is dropped, so is
+/// the exclusive access.
+/// Of course this access can be bypassed in various ways, for example, `Ctrl-C` or "temperature
+/// too high" can initiate the shutdown of a hashchain despite it's being locked.
 #[derive(Debug)]
-pub struct StoppedChain {
-    pub manager: Arc<Manager>,
+pub struct Token {
+    manager: Arc<Manager>,
 }
 
-impl Drop for StoppedChain {
+impl Token {
+    fn new(manager: Arc<Manager>) -> Self {
+        Token { manager }
+    }
+
+    fn manager(&self) -> Arc<Manager> {
+        self.manager.clone()
+    }
+}
+
+impl Drop for Token {
     fn drop(&mut self) {
         // remove ownership in case we are dropped
         self.manager
             .owned_by
             .lock()
-            .expect("BUG: lock failed")
-            .take();
+            .expect("BUG: token lock failed")
+            .take()
+            .expect("BUG: manager was unlocked but token was in circulation");
     }
 }
 
+#[derive(Debug)]
+pub struct StoppedChain {
+    token: Token,
+    pub manager: Arc<Manager>,
+}
+
 impl StoppedChain {
-    pub fn from_manager(manager: Arc<Manager>) -> Self {
-        StoppedChain { manager }
+    pub fn from_token(token: Token) -> Self {
+        StoppedChain {
+            manager: token.manager(),
+            token,
+        }
+    }
+
+    pub fn from_running(running_chain: RunningChain) -> Self {
+        let RunningChain { token, .. } = running_chain;
+        Self::from_token(token)
     }
 
     pub async fn start(
@@ -133,10 +162,7 @@ impl StoppedChain {
                 Ok(_) => {
                     // we've started the hashchain
                     // create a `Running` tape and be gone
-                    return Ok(RunningChain::from_manager(
-                        self.manager.clone(),
-                        self.manager.inner.lock().await,
-                    ));
+                    return Ok(RunningChain::from_stopped(self).await);
                 }
                 // start failed
                 Err(e) => {
@@ -161,41 +187,36 @@ impl StoppedChain {
 
 #[derive(Debug)]
 pub struct RunningChain {
+    token: Token,
     pub manager: Arc<Manager>,
     pub start_id: usize,
     pub asic_difficulty: usize,
 }
 
-impl Drop for RunningChain {
-    fn drop(&mut self) {
-        // remove ownership in case we are dropped
-        self.manager
-            .owned_by
-            .lock()
-            .expect("BUG: lock failed")
-            .take();
-    }
-}
-
 impl RunningChain {
-    pub fn from_manager(manager: Arc<Manager>, inner: MutexGuard<ManagerInner>) -> Self {
+    pub async fn from_token(token: Token) -> Self {
+        let manager = token.manager();
+        let inner = manager.inner.lock().await;
         let hash_chain = inner
             .hash_chain
             .as_ref()
             .expect("BUG: hashchain is not running");
         RunningChain {
-            manager: manager.clone(),
             asic_difficulty: hash_chain.asic_difficulty,
             start_id: inner.start_count,
+            token,
+            manager: manager.clone(),
         }
+    }
+
+    pub async fn from_stopped(stopped_chain: StoppedChain) -> Self {
+        let StoppedChain { token, .. } = stopped_chain;
+        Self::from_token(token).await
     }
 
     pub async fn stop(self) -> StoppedChain {
         self.manager.stop_chain(false).await;
-
-        StoppedChain {
-            manager: self.manager.clone(),
-        }
+        StoppedChain::from_running(self)
     }
 
     /// TODO: for the love of god use macros or something
@@ -397,11 +418,11 @@ impl Manager {
             owned_by.replace(owner_name);
         }
         // Create a `Chain` instance. If it's dropped, the ownership reverts back to `Manager`
-        let inner = self.inner.lock().await;
-        Ok(if inner.hash_chain.is_some() {
-            ChainStatus::Running(RunningChain::from_manager(self.clone(), inner))
+        let token = Token::new(self.clone());
+        Ok(if self.inner.lock().await.hash_chain.is_some() {
+            ChainStatus::Running(RunningChain::from_token(token).await)
         } else {
-            ChainStatus::Stopped(StoppedChain::from_manager(self.clone()))
+            ChainStatus::Stopped(StoppedChain::from_token(token))
         })
     }
 
