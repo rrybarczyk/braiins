@@ -6,15 +6,15 @@ bos:
   # select NAND firmware which is used for boot
   firmware: 1
 
-miner:
-  # default miner pool
-  pool:
-    host: stratum2+tcp://v2.stratum.slushpool.com
+#miner:
+#  # default miner pool
+#  pool:
+#    host: stratum2+tcp://v2.stratum.slushpool.com
 #    port: 3336
-    path: u95GEReVMjK6k5YqiSFNqqTnKU4ypU2Wm8awa6tmbmDmk1bWt
-    user: '!non-existent-user!'
+#    path: u95GEReVMjK6k5YqiSFNqqTnKU4ypU2Wm8awa6tmbmDmk1bWt
+#    user: '!non-existent-user!'
 #    pass: x
-  # HW specific settings
+#  # HW specific settings
 #  hw:
 #    freq: 550
 #    voltage: '0706'

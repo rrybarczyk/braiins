@@ -22,7 +22,7 @@
 # of such proprietary license or if you have any other questions, please
 # contact us at opensource@braiins.com.
 
-if [ "$#" -ne 5 ]; then
+if [ "$#" -ne 6 ]; then
 	echo "Illegal number of parameters" >&2
 	exit 1
 fi
@@ -30,10 +30,11 @@ fi
 set -e
 
 MINER_HWID="$1"
-MINER_PSU_POWER_LIMIT="$2"
-KEEP_NET_CONFIG="$3"
-KEEP_HOSTNAME="$4"
-DRY_RUN="$5"
+MINER_POOL_USER="$2"
+MINER_PSU_POWER_LIMIT="$3"
+KEEP_NET_CONFIG="$4"
+KEEP_HOSTNAME="$5"
+DRY_RUN="$6"
 
 UBOOT_ENV_CFG="uboot_env.config"
 
@@ -139,6 +140,7 @@ fw_setenv -c "$UBOOT_ENV_CFG" --script - <<-EOF
 	#
 	# set miner configuration
 	miner_hwid ${MINER_HWID}
+	miner_pool_user ${MINER_POOL_USER}
 	#
 	# s9 specific configuration
 	miner_freq ${MINER_FREQ}

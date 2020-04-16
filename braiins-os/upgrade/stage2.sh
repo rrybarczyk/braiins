@@ -35,6 +35,8 @@ MINER_HWID=$(fw_printenv -n miner_hwid 2> /dev/null)
 
 # turn off error checking for auxiliary settings
 set +e
+MINER_POOL_USER=$(fw_printenv -n miner_pool_user 2> /dev/null)
+
 STAGE3_OFFSET=$(fw_printenv -n stage3_off 2> /dev/null)
 STAGE3_SIZE=$(fw_printenv -n stage3_size 2> /dev/null)
 STAGE3_MTD=/dev/mtd$(fw_printenv -n stage3_mtd 2> /dev/null)
@@ -72,6 +74,7 @@ fw_setenv -c miner_cfg.config --script - <<-EOF
 	#
 	# miner settings
 	miner_hwid=${MINER_HWID}
+	miner_pool_user ${MINER_POOL_USER}
 	miner_freq=${MINER_FREQ}
 	miner_voltage=${MINER_VOLTAGE}
 	miner_fixed_freq=${MINER_FIXED_FREQ}
