@@ -49,6 +49,7 @@ NET_DNS_SERVERS=$(fw_printenv -n net_dns_servers 2> /dev/null)
 MINER_FREQ=$(fw_printenv -n miner_freq 2> /dev/null)
 MINER_VOLTAGE=$(fw_printenv -n miner_voltage 2> /dev/null)
 MINER_FIXED_FREQ=$(fw_printenv -n miner_fixed_freq 2> /dev/null)
+MINER_PSU_POWER_LIMIT=$(fw_printenv -n miner_psu_power_limit 2> /dev/null)
 set -e
 
 mtd_write fit.itb recovery
@@ -74,6 +75,7 @@ fw_setenv -c miner_cfg.config --script - <<-EOF
 	miner_freq=${MINER_FREQ}
 	miner_voltage=${MINER_VOLTAGE}
 	miner_fixed_freq=${MINER_FIXED_FREQ}
+	miner_psu_power_limit=${MINER_PSU_POWER_LIMIT}
 EOF
 
 

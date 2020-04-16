@@ -48,6 +48,7 @@ boot()
 		local miner_freq=$(get_env_config miner_freq)
 		local miner_voltage=$(get_env_config miner_voltage)
 		local miner_fixed_freq=$(get_env_config miner_fixed_freq)
+		local miner_psu_power_limit=$(get_env_config miner_psu_power_limit)
 
 		# use the public key of our pool that allows authentication of the default Stratum V2 host
 		[ -z "$pool_path" -a -z "$pool_host" ] && \
@@ -56,9 +57,12 @@ boot()
 		pool_host=${pool_host:-stratum2+tcp://v2.stratum.slushpool.com}
 		pool_user=${pool_user:-!non-existent-user!}
 
+		local plus=""
+		case $BOS_VERSION_SUFFIX in *plus*) plus="+";; esac
+
 		cat > "$CONF" <<-END
 			[format]
-			version = '1.0'
+			version = '1.0${plus}'
 			model = 'Antminer S9'
 			generator = 'init_script'
 			timestamp = $(date +%s)
@@ -86,6 +90,13 @@ boot()
 		[ -n "$pool_pass" ] && \
 		cat >> "$CONF" <<-END
 			password = '${pool_pass}'
+		END
+		[ -n "$plus" -a -n "$miner_psu_power_limit" ] && \
+		cat >> "$CONF" <<-END
+
+			[autotuning]
+			enabled = true
+			psu_power_limit = ${miner_psu_power_limit}
 		END
 	fi
 	start "$@"

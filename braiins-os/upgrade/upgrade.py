@@ -142,6 +142,7 @@ def main(args):
         hw_id = hwid.generate()
 
         # get other stage1 parameters
+        hw_psu_power_limit = args.psu_power_limit or ''
         keep_network = 'no' if args.no_keep_network else 'yes'
         keep_hostname = 'yes' if args.keep_hostname else 'no'
         dry_run = 'yes' if args.dry_run else 'no'
@@ -150,7 +151,8 @@ def main(args):
         try:
             print("Upgrading firmware...")
             stdout, _ = ssh.run('cd', TARGET_DIR, '&&', 'ls', '-l', '&&',
-                                "/bin/sh stage1.sh '{}' {} {} {}".format(hw_id, keep_network, keep_hostname, dry_run))
+                                "/bin/sh stage1.sh '{}' {} {} {} {}"
+                                .format(hw_id, hw_psu_power_limit, keep_network, keep_hostname, dry_run))
         except subprocess.CalledProcessError as error:
             cleanup_system(ssh)
             print()
@@ -191,6 +193,8 @@ if __name__ == "__main__":
                         help='skip miner backup before upgrade')
     parser.add_argument('--no-nand-backup', action='store_true',
                         help='skip full NAND backup (config is still being backed up)')
+    parser.add_argument('--psu-power-limit', nargs='?', type=int,
+                        help='set PSU power limit (in watts)')
     parser.add_argument('--no-keep-network', action='store_true',
                         help='do not keep miner network configuration (use DHCP)')
     parser.add_argument('--keep-hostname', action='store_true',

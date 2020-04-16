@@ -22,7 +22,7 @@
 # of such proprietary license or if you have any other questions, please
 # contact us at opensource@braiins.com.
 
-if [ "$#" -ne 4 ]; then
+if [ "$#" -ne 5 ]; then
 	echo "Illegal number of parameters" >&2
 	exit 1
 fi
@@ -30,9 +30,10 @@ fi
 set -e
 
 MINER_HWID="$1"
-KEEP_NET_CONFIG="$2"
-KEEP_HOSTNAME="$3"
-DRY_RUN="$4"
+MINER_PSU_POWER_LIMIT="$2"
+KEEP_NET_CONFIG="$3"
+KEEP_HOSTNAME="$4"
+DRY_RUN="$5"
 
 UBOOT_ENV_CFG="uboot_env.config"
 
@@ -143,6 +144,7 @@ fw_setenv -c "$UBOOT_ENV_CFG" --script - <<-EOF
 	miner_freq ${MINER_FREQ}
 	miner_voltage ${MINER_VOLTAGE}
 	miner_fixed_freq ${MINER_FIXED_FREQ}
+	miner_psu_power_limit ${MINER_PSU_POWER_LIMIT}
 EOF
 
 # set network konfiguration

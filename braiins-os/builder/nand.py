@@ -41,6 +41,7 @@ NET_HOSTNAME = 'net_hostname'
 HW_FREQ = 'miner_freq'
 HW_VOLTAGE = 'miner_voltage'
 HW_FIXED_FREQ = 'miner_fixed_freq'
+HW_PSU_POWER_LIMIT = 'miner_psu_power_limit'
 
 MINER_HWID = 'miner_hwid'
 MINER_POOL_HOST = 'miner_pool_host'
@@ -59,6 +60,7 @@ MINER_CFG_INPUT = [
     (HW_FREQ, 'miner.hw.freq', ''),
     (HW_VOLTAGE, 'miner.hw.voltage', ''),
     (HW_FIXED_FREQ, 'miner.hw.fixed_freq', ''),
+    (HW_PSU_POWER_LIMIT, 'miner.hw.psu_power_limit', ''),
     (MINER_HWID, 'miner.hwid', hwid.generate),
     (MINER_POOL_HOST, 'miner.pool.host', 'stratum2+tcp://v2.stratum.slushpool.com'),
     (MINER_POOL_PORT, 'miner.pool.port', ''),

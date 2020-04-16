@@ -19,6 +19,7 @@ miner:
 #    freq: 550
 #    voltage: '0706'
 #    fixed_freq: true
+#    psu_power_limit: 1420
 
 net:
   # default bOS device MAC address
