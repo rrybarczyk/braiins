@@ -37,11 +37,17 @@ from upgrade.platform import PlatformStop
 from upgrade.ssh import SSHManager, SSHError
 from upgrade.transfer import upload_local_files, wait_for_port, Progress
 
+from upgrade.util import get_data_root_path
+
+# default credentials for connecting to device. will ask password if they wont do
 USERNAME = 'root'
 PASSWORD = None
 
-SYSTEM_DIR = 'system'
-SOURCE_DIR = 'firmware'
+# binaries necessary for upgrade will be copied onto host from here (sftp, fw_printenv)
+SYSTEM_DIR = os.path.join(get_data_root_path(), 'system')
+# recovery partition files?
+SOURCE_DIR = os.path.join(get_data_root_path(), 'firmware')
+# stage3 stagging dir, to be tarballed for transfer
 TARGET_DIR = '/tmp/firmware'
 
 STAGE3_BUILTIN_DIR = 'post-upgrade'

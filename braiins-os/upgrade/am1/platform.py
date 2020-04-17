@@ -24,6 +24,7 @@ import subprocess
 import tarfile
 import hashlib
 import shutil
+import sys
 import time
 import os
 import io
@@ -35,12 +36,16 @@ from tempfile import TemporaryDirectory, TemporaryFile
 from .backup import ssh_run, ssh_mac, ssh_factory_mtdparts, ssh_backup, ssh_restore, ssh_restore_reboot
 from .backup import get_stream_size, get_default_hostname
 from .transfer import Progress
+from .util import get_data_root_path
 
 CONFIG_TAR = 'config.tar.gz'
+# Directory within the factory .tar.gz that contains all necessary firmware files.
+# Note, that its content will be directly extracted and uploaded onto the target
+# hardware, therefore there is no need for get_data_root_path() element to be prepended
 XILINX_DIR = 'xilinx/'
 TARGET_DIR = '/tmp/bitmain_fw'
 
-RESTORE_DIR = 'upgrade'
+RESTORE_DIR = os.path.join(get_data_root_path(), 'upgrade')
 RESTORE_NAME = 'restore.sh'
 
 FACTORY_MTDPARTS = \
@@ -288,5 +293,12 @@ def cleanup_system(ssh):
 
 
 def add_restore_arguments(parser):
-    parser.add_argument('--factory-image',
+    if getattr(sys, 'frozen', False):
+        default_factory_fw = os.path.join(get_data_root_path(),
+                                          'Antminer-S9-all-201812051512-autofreq-user-Update2UBI-NF.tar.gz')
+        print("Using default factory firmware to: {}".format(default_factory_fw))
+    else:
+        default_factory_fw = None
+
+    parser.add_argument('--factory-image', default=default_factory_fw,
                         help='path/url to original firmware upgrade image')
