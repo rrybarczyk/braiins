@@ -131,6 +131,9 @@ fi
 
 echo "U-Boot configuration..."
 
+# set pool count to zero when it is not set
+MINER_POOL_COUNT=${MINER_POOL_COUNT:-0}
+
 fw_setenv -c "$UBOOT_ENV_CFG" --script - <<-EOF
 	# bitstream metadata
 	bitstream_off ${DST_BITSTREAM_OFF}
@@ -161,7 +164,16 @@ fw_setenv -c "$UBOOT_ENV_CFG" --script - <<-EOF
 	miner_voltage ${MINER_VOLTAGE}
 	miner_fixed_freq ${MINER_FIXED_FREQ}
 	miner_psu_power_limit ${MINER_PSU_POWER_LIMIT}
+	#
+	# user defined pools
+	miner_pool_count ${MINER_POOL_COUNT}
 EOF
+for i in $(seq 1 $MINER_POOL_COUNT); do
+	eval echo miner_pool_host_$i '$MINER_POOL_HOST_'$i
+	eval echo miner_pool_port_$i '$MINER_POOL_PORT_'$i
+	eval echo miner_pool_user_$i '$MINER_POOL_USER_'$i
+	eval echo miner_pool_pass_$i '$MINER_POOL_PASS_'$i
+done | fw_setenv -c "$UBOOT_ENV_CFG" --script -
 
 # set network konfiguration
 if [ x"$KEEP_NET_CONFIG" == x"yes" ]; then
