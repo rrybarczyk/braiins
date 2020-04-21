@@ -22,7 +22,7 @@
 # of such proprietary license or if you have any other questions, please
 # contact us at opensource@braiins.com.
 
-if [ "$#" -ne 6 ]; then
+if [ "$#" -ne 7 ]; then
 	echo "Illegal number of parameters" >&2
 	exit 1
 fi
@@ -34,7 +34,8 @@ MINER_POOL_USER="$2"
 MINER_PSU_POWER_LIMIT="$3"
 KEEP_NET_CONFIG="$4"
 KEEP_HOSTNAME="$5"
-DRY_RUN="$6"
+KEEP_POOLS="$6"
+DRY_RUN="$7"
 
 UBOOT_ENV_CFG="uboot_env.config"
 
@@ -130,6 +131,8 @@ if [ -f "$STAGE3_FIRMWARE" ]; then
 fi
 
 echo "U-Boot configuration..."
+
+[ x"$KEEP_POOLS" == x"yes" ] || MINER_POOL_COUNT=
 
 # set pool count to zero when it is not set
 MINER_POOL_COUNT=${MINER_POOL_COUNT:-0}
