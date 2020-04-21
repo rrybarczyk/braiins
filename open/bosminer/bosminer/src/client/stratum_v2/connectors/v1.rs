@@ -104,6 +104,8 @@ impl V2ConnectorSender {
     }
 }
 
+/// TODO: improve error handling, it is not optimal to convert SendError's into String and then
+/// int a General error of a 3rd party crate
 impl Sink<<v2::Framing as ii_wire::Framing>::Tx> for V2ConnectorSender {
     type Error = <v2::Framing as ii_wire::Framing>::Error;
 
@@ -111,7 +113,7 @@ impl Sink<<v2::Framing as ii_wire::Framing>::Tx> for V2ConnectorSender {
         self.project()
             .inner
             .poll_ready(cx)
-            .map_err(|e| ii_stratum::error::ErrorKind::Io(e.to_string()).into())
+            .map_err(|e| ii_stratum::error::Error::General(e.to_string()).into())
     }
 
     fn start_send(
@@ -121,21 +123,21 @@ impl Sink<<v2::Framing as ii_wire::Framing>::Tx> for V2ConnectorSender {
         self.project()
             .inner
             .start_send(item)
-            .map_err(|e| ii_stratum::error::ErrorKind::Io(e.to_string()).into())
+            .map_err(|e| ii_stratum::error::Error::General(e.to_string()).into())
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         self.project()
             .inner
             .poll_flush(cx)
-            .map_err(|e| ii_stratum::error::ErrorKind::Io(e.to_string()).into())
+            .map_err(|e| ii_stratum::error::Error::General(e.to_string()).into())
     }
 
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         self.project()
             .inner
             .poll_close(cx)
-            .map_err(|e| ii_stratum::error::ErrorKind::Io(e.to_string()).into())
+            .map_err(|e| ii_stratum::error::Error::General(e.to_string()).into())
     }
 }
 
