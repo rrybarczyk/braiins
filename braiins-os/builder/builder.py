@@ -165,6 +165,10 @@ class Builder:
     UPGRADE_SCRIPT_REQUIREMENTS = 'requirements.txt'
     UPGRADE_STAGE1_CONTROL_SRC = 'CONTROL'
     UPGRADE_STAGE1_CONTROL = 'CONTROL'
+    UPGRADE_JSON_AWK_SRC = 'JSON.awk'
+    UPGRADE_JSON_AWK = 'JSON.awk'
+    UPGRADE_JSON_JQ_SRC = 'jq.awk'
+    UPGRADE_JSON_JQ = 'jq.awk'
     UPGRADE_STAGE1_SCRIPT = 'stage1.sh'
     UPGRADE_STAGE2_SCRIPT = 'stage2.sh'
     UPGRADE_STAGE3_SCRIPT_TEMPLATE = 'stage3.sh.template'
@@ -1843,6 +1847,12 @@ class Builder:
             # copy stage1 upgrade script
             upgrade = self._get_project_file(self.UPGRADE_DIR, self.UPGRADE_STAGE1_SCRIPT)
             upload_manager.put(upgrade, self.UPGRADE_STAGE1_SCRIPT)
+
+            # copy JSON utilities
+            json_awk = self._get_upgrade_file(self.UPGRADE_JSON_AWK_SRC, version)
+            upload_manager.put(json_awk, self.UPGRADE_JSON_AWK)
+            json_jq = self._get_upgrade_file(self.UPGRADE_JSON_JQ_SRC, version)
+            upload_manager.put(json_jq, self.UPGRADE_JSON_JQ)
         else:
             # firmware files are obtained from previous version
             upload_manager.put_all(os.path.join(base_system[1], self.UPGRADE_FIRMWARE_DIR))

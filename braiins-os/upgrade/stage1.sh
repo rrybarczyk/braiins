@@ -75,6 +75,20 @@ sed_variables() {
 	eval sed -i $args "$input"
 }
 
+json_get() {
+	local file="$1"
+	local jpath="$2"
+
+	awk -f jq.awk -f JSON.awk -v STREAM=0 -v _JQ_SELECT="$jpath" "$file"
+}
+
+json_array_len() {
+	local file="$1"
+	local jpath="$2"
+
+	awk -f jq.awk -f JSON.awk -v STREAM=0 -v _JQ_COUNT="$jpath" "$file"
+}
+
 # include firmware specific code
 . ./CONTROL
 
