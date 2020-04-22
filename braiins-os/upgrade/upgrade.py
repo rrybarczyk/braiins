@@ -100,7 +100,7 @@ def main(args):
         # check compatibility of remote server
         check_compatibility(ssh)
 
-        if not args.no_backup:
+        if args.backup:
             mac = backup.ssh_mac(ssh)
             backup_dir = backup.get_output_dir(mac)
             if not platform.backup_firmware(args, ssh, backup_dir, mac):
@@ -192,8 +192,8 @@ if __name__ == "__main__":
 
     parser.add_argument('hostname',
                         help='hostname of miner with original firmware')
-    parser.add_argument('--no-backup', action='store_true',
-                        help='skip miner backup before upgrade')
+    parser.add_argument('--backup', action='store_true',
+                        help='do miner backup before upgrade')
     parser.add_argument('--no-nand-backup', action='store_true',
                         help='skip full NAND backup (config is still being backed up)')
     parser.add_argument('--pool-user', nargs='?',
