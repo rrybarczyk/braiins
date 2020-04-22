@@ -142,8 +142,13 @@ def main(args):
         hw_id = hwid.generate()
 
         # get other stage1 parameters
+        if args.psu_power_limit == 0:
+            # 0 is special parameter for disabling autotuning
+            psu_power_limit = ''
+        else:
+            psu_power_limit = args.psu_power_limit or 'default'
+
         pool_user = args.pool_user or ''
-        psu_power_limit = args.psu_power_limit or ''
         keep_network = 'no' if args.no_keep_network else 'yes'
         keep_pools = 'no' if args.no_keep_pools else 'yes'
         keep_hostname = 'yes' if args.keep_hostname else 'no'

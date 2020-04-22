@@ -49,6 +49,17 @@ boot()
 		local miner_voltage=$(get_env_config miner_voltage)
 		local miner_fixed_freq=$(get_env_config miner_fixed_freq)
 		local miner_psu_power_limit=$(get_env_config miner_psu_power_limit)
+		local autotuning_enabled="yes"
+
+		case $miner_psu_power_limit in
+			default)
+				miner_psu_power_limit=
+			;;
+			"")
+				autotuning_enabled="no"
+				miner_psu_power_limit=
+			;;
+		esac
 
 		# use the public key of our pool that allows authentication of the default Stratum V2 host
 		[ -z "$pool_path" -a -z "$pool_host" ] && \
@@ -91,11 +102,14 @@ boot()
 		cat >> "$CONF" <<-END
 			password = '${pool_pass}'
 		END
-		[ -n "$plus" -a -n "$miner_psu_power_limit" ] && \
+		[ -n "$plus" -a "$autotuning_enabled" == "yes" ] && \
 		cat >> "$CONF" <<-END
 
 			[autotuning]
 			enabled = true
+		END
+		[ -n "$plus" -a -n "$miner_psu_power_limit" ] && \
+		cat >> "$CONF" <<-END
 			psu_power_limit = ${miner_psu_power_limit}
 		END
 	fi
