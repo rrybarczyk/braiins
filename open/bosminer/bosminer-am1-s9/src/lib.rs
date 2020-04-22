@@ -749,13 +749,23 @@ impl hal::Backend for Backend {
                 config::DEFAULT_POOL_ENABLED,
             )
             .await?;
-        if let Some(hooks) = hooks {
+        if let Some(hooks) = hooks.as_ref() {
             // Pass the client manager to hook for further processing
             hooks.clients_loaded(client_manager).await;
         }
 
+        let mut cgminer_custom_commands =
+            cgminer::create_custom_commands(backend, managers, monitor);
+        if let Some(hooks) = hooks.as_ref() {
+            // Let hooks have a go at the commands
+            hooks
+                .clone()
+                .cgminer_custom_commands_created(&mut cgminer_custom_commands)
+                .await;
+        }
+
         Ok(hal::FrontendConfig {
-            cgminer_custom_commands: cgminer::create_custom_commands(backend, managers, monitor),
+            cgminer_custom_commands: Some(cgminer_custom_commands),
         })
     }
 

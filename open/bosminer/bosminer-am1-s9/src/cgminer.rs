@@ -208,7 +208,7 @@ pub fn create_custom_commands(
     backend: Arc<crate::Backend>,
     managers: Vec<Arc<crate::Manager>>,
     monitor: Arc<monitor::Monitor>,
-) -> Option<command::Map> {
+) -> command::Map {
     let handler = Arc::new(Handler::new(backend.to_string(), managers, monitor));
 
     let custom_commands = commands![
@@ -218,5 +218,5 @@ pub fn create_custom_commands(
         (FANS: ParameterLess -> handler.handle_fans)
     ];
 
-    Some(custom_commands)
+    custom_commands
 }
