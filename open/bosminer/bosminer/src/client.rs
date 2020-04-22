@@ -28,7 +28,6 @@ mod scheduler;
 // Sub-modules with client implementation
 pub mod drain;
 pub mod stratum_v2;
-pub mod stratum_v2_channels;
 
 use crate::error;
 use crate::hal;
@@ -93,9 +92,11 @@ impl Handle {
                     channel.is_none(),
                     "BUG: protocol 'Stratum V1' does not support channel"
                 );
-                Arc::new(stratum_v2_channels::StratumClient::new(
-                    stratum_v2_channels::ConnectionDetails::from_descriptor(&descriptor),
+                Arc::new(stratum_v2::StratumClient::new(
+                    stratum_v2::ConnectionDetails::from_descriptor(&descriptor),
+                    backend_info,
                     job_solver,
+                    channel,
                 ))
             }
             ClientProtocol::StratumV2(_) => Arc::new(stratum_v2::StratumClient::new(

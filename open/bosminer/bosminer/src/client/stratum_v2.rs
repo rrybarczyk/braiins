@@ -22,6 +22,7 @@
 
 // Sub-modules with client implementation
 pub mod telemetry;
+mod v1;
 
 use ii_logging::macros::*;
 
@@ -500,6 +501,11 @@ impl StratumConnectionHandler {
         // client instance
         // TODO rename to client_framed_connection
         let client_framed_stream = match connection_details.protocol {
+            // V1 connector
+            ClientProtocol::StratumV1 => {
+                let connector = v1::Connector::new(false);
+                return connector.connect(connection).await;
+            }
             // V2 secure connector
             ClientProtocol::StratumV2(upstream_authority_public_key) => {
                 let noise_initiator =
