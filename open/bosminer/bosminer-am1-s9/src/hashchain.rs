@@ -261,8 +261,8 @@ pub struct HashChain {
     /// want to do this).
     pub(crate) disable_init_work: bool,
     /// channels through which temperature status is sent
-    temperature_sender: Mutex<Option<watch::Sender<Option<sensor::Temperature>>>>,
-    temperature_receiver: watch::Receiver<Option<sensor::Temperature>>,
+    temperature_sender: Mutex<Option<watch::Sender<sensor::Temperature>>>,
+    temperature_receiver: watch::Receiver<sensor::Temperature>,
     /// nonce counter
     pub counter: Arc<Mutex<counters::HashChain>>,
     /// halter to stop this hashchain
@@ -307,7 +307,8 @@ impl HashChain {
         PRECOMPUTED_PLL.get_or_init(|| bm1387::PllTable::build_pll_table(CHIP_OSC_CLK_HZ));
 
         // create temperature sending channel
-        let (temperature_sender, temperature_receiver) = watch::channel(None);
+        let (temperature_sender, temperature_receiver) =
+            watch::channel(sensor::INVALID_TEMPERATURE_READING);
 
         // create halt notification channel
         let (halt_sender, halt_receiver) = halt::make_pair(HALT_TIMEOUT);
@@ -338,7 +339,7 @@ impl HashChain {
         })
     }
 
-    pub fn current_temperature(&self) -> Option<sensor::Temperature> {
+    pub fn current_temperature(&self) -> sensor::Temperature {
         self.temperature_receiver.borrow().clone()
     }
 
@@ -841,6 +842,20 @@ impl HashChain {
         Ok(sensor)
     }
 
+    /// This task just pings watchdog with no sensor readings
+    async fn no_sensor_task(&self) {
+        loop {
+            delay_for(bosminer_antminer::monitor::TEMP_UPDATE_INTERVAL).await;
+
+            // Send heartbeat to monitor with "unknown" temperature
+            self.monitor_tx
+                .unbounded_send(monitor::Message::Running(
+                    sensor::INVALID_TEMPERATURE_READING,
+                ))
+                .expect("send failed");
+        }
+    }
+
     /// Monitor watchdog task.
     /// This task sends periodically ping to monitor task. It also tries to read temperature.
     async fn monitor_watchdog_temp_task(self: Arc<Self>) {
@@ -874,41 +889,42 @@ impl HashChain {
         {
             error::Result::Err(e) => {
                 error!("Sensor probing failed: {}", e);
-                None
+                return self.no_sensor_task().await;
             }
-            error::Result::Ok(sensor) => Some(sensor),
+            error::Result::Ok(sensor) => sensor,
         };
 
         // "Watchdog" loop that pings monitor every some seconds
         loop {
             // If we have temperature sensor, try to read it
-            let temp = if let Some(sensor) = sensor.as_mut() {
-                match sensor
-                    .read_temperature()
-                    .await
-                    .map_err(|e| error::Error::from(e))
-                    .with_context(|_| {
-                        ErrorKind::Hashboard(self.hashboard_idx, "temperature read fail".into())
-                    })
-                    .map_err(|e| e.into())
-                {
-                    error::Result::Ok(temp) => {
-                        info!("Measured temperature: {:?}", temp);
-                        temp
-                    }
-                    error::Result::Err(e) => {
-                        error!("Sensor temperature read failed: {}", e);
-                        sensor::INVALID_TEMPERATURE_READING
-                    }
+            let temp = match sensor
+                .read_temperature()
+                .await
+                .map_err(|e| error::Error::from(e))
+                .with_context(|_| {
+                    ErrorKind::Hashboard(self.hashboard_idx, "temperature read fail".into())
+                })
+                .map_err(|e| e.into())
+            {
+                error::Result::Ok(temp) => {
+                    info!(
+                        "Hashchain {}: Measured temperature: {:?}",
+                        self.hashboard_idx, temp
+                    );
+                    temp
                 }
-            } else {
-                // Otherwise just make empty temperature reading
-                sensor::INVALID_TEMPERATURE_READING
+                error::Result::Err(e) => {
+                    error!(
+                        "Hashchain {}: Sensor temperature read failed: {}",
+                        self.hashboard_idx, e
+                    );
+                    sensor::INVALID_TEMPERATURE_READING
+                }
             };
 
             // Broadcast
             temperature_sender
-                .broadcast(Some(temp.clone()))
+                .broadcast(temp.clone())
                 .expect("temp broadcast failed");
 
             // Send heartbeat to monitor
@@ -916,8 +932,7 @@ impl HashChain {
                 .unbounded_send(monitor::Message::Running(temp))
                 .expect("send failed");
 
-            // TODO: sync this delay with monitor task
-            delay_for(Duration::from_secs(5)).await;
+            delay_for(bosminer_antminer::monitor::TEMP_UPDATE_INTERVAL).await;
         }
     }
 

@@ -46,8 +46,9 @@ use tokio::time::delay_for;
 const START_TIMEOUT: Duration = Duration::from_secs(180);
 /// If miner doesn't send temperature update within this time, mark it as dead.
 /// This timeout doubles as hashchain watchdog timeout.
-/// TODO: Synchronize timeout with temperature monitor task
 const RUN_UPDATE_TIMEOUT: Duration = Duration::from_secs(10);
+/// How often to update temperature - should be strictly less than `RUN_UPDATE_TIMEOUT`
+pub const TEMP_UPDATE_INTERVAL: Duration = Duration::from_secs(5);
 /// How often check timeouts and adjust PID
 const TICK_LENGTH: Duration = Duration::from_secs(5);
 /// How long does it take until miner warm up? We won't let it tu turn fans off until then...

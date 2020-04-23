@@ -289,7 +289,7 @@ impl RunningChain {
             .await
     }
 
-    pub async fn current_temperature(&self) -> Option<sensor::Temperature> {
+    pub async fn current_temperature(&self) -> sensor::Temperature {
         self.manager
             .inner
             .lock()
