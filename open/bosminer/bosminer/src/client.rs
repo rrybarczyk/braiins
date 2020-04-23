@@ -228,6 +228,10 @@ impl Handle {
         }
     }
 
+    /// Try restart the client
+    /// `enabled` - enforces the method to return an error if the client is already disabled,
+    /// so the initial stop fails. Set this parameter to false if you want to restart the client
+    /// regardless of its current state.
     #[inline]
     pub fn try_restart(&self, enabled: bool) -> Result<(), ()> {
         match self.try_disable() {

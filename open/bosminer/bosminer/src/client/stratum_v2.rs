@@ -57,7 +57,7 @@ use std::time;
 
 use ii_stratum::v2::messages::{
     NewMiningJob, OpenStandardMiningChannel, OpenStandardMiningChannelError,
-    OpenStandardMiningChannelSuccess, SetNewPrevHash, SetTarget, SetupConnection,
+    OpenStandardMiningChannelSuccess, Reconnect, SetNewPrevHash, SetTarget, SetupConnection,
     SetupConnectionError, SetupConnectionSuccess, SubmitSharesError, SubmitSharesStandard,
     SubmitSharesSuccess,
 };
@@ -348,6 +348,22 @@ impl Handler for StratumEventHandler {
         self.update_job(&future_job_msg).await;
     }
 
+    async fn visit_reconnect(&mut self, _header: &Header, reconnect_msg: &Reconnect) {
+        let new_host: String = reconnect_msg.new_host.clone().into();
+        info!(
+            "Reconnect to: {} {}, received on established connection: {}",
+            new_host,
+            reconnect_msg.new_port,
+            self.client.connection_details().get_host_and_port()
+        );
+        self.client
+            .reconnect(
+                reconnect_msg.new_host.clone().into(),
+                reconnect_msg.new_port,
+            )
+            .await;
+    }
+
     async fn visit_set_target(&mut self, _header: &Header, target_msg: &SetTarget) {
         self.update_target(target_msg.max_target);
     }
@@ -576,6 +592,19 @@ impl Handler for StratumConnectionHandler {
     ) {
         self.status =
             Err(format!("Open channel error: {}", error_msg.code.to_string()).into()).into();
+    }
+
+    async fn visit_reconnect(&mut self, _header: &Header, reconnect_msg: &Reconnect) {
+        let new_host: String = reconnect_msg.new_host.clone().into();
+        info!(
+            "Reconnect to: {} {}, received while connecting to: {}",
+            new_host,
+            reconnect_msg.new_port,
+            self.client.connection_details().get_host_and_port()
+        );
+        self.client
+            .reconnect(new_host, reconnect_msg.new_port)
+            .await;
     }
 }
 
@@ -933,6 +962,33 @@ impl StratumClient {
             }
             // Restarting
         }
+    }
+
+    /// Process a reconnect to a specified host and port. Note, that reconnect doesn't specify
+    /// pool authority key. It is not possible (for security reasons) to reconnect to a different
+    /// entity that has a different key. The prevents hijacking the hashrate should the upstream
+    /// server be compromised.
+    /// `host` where to reconnect to (
+    async fn reconnect(&self, new_host: String, new_port: u16) {
+        let mut connection_details = self
+            .connection_details
+            .lock()
+            .expect("BUG: cannot lock connection details");
+
+        // Change current connection descriptor
+        if new_host.len() > 0 {
+            // Detect change in host
+            if new_host != connection_details.host {
+                connection_details.host = new_host;
+            }
+            // Detect change in port
+            if new_port != 0 && connection_details.port != new_port {
+                connection_details.port = new_port;
+            }
+        }
+        drop(connection_details);
+        // Ignore the result
+        self.status.initiate_stopping();
     }
 }
 
