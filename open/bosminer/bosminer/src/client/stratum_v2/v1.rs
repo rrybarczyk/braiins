@@ -48,6 +48,9 @@ impl Connector {
         Self {
             translation_options: V2ToV1TranslationOptions {
                 try_enable_xnsub: extranonce_subscribe,
+                // We want to receive the reconnect messages from the translation component so
+                // that the connection can be dropped and reconnected somewhere else
+                propagate_reconnect_downstream: true,
             },
         }
     }
