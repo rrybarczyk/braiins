@@ -24,6 +24,8 @@
 
 pub mod pid;
 
+use std::fmt;
+
 use crate::error::{self, ErrorKind};
 use failure::ResultExt;
 
@@ -48,6 +50,12 @@ impl Speed {
     }
 }
 
+impl fmt::Display for Speed {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}%", self.0)
+    }
+}
+
 /// Speed of fans read from feedback pins
 #[derive(Debug, Clone)]
 pub struct Feedback {
@@ -57,6 +65,24 @@ pub struct Feedback {
 impl Feedback {
     pub fn num_fans_running(&self) -> usize {
         self.rpm.iter().filter(|rpm| **rpm > 0).count()
+    }
+}
+
+impl fmt::Display for Feedback {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.rpm
+                .iter()
+                .map(|&rpm| if rpm >= 1000 {
+                    format!("{:.1}K", rpm as f32 / 1000.0)
+                } else {
+                    format!("{}", rpm)
+                })
+                .collect::<Vec<_>>()
+                .join(" ")
+        )
     }
 }
 

@@ -30,6 +30,7 @@ use crate::halt;
 
 use ii_sensors::{self as sensor, Measurement};
 
+use std::fmt;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -97,6 +98,16 @@ impl ChainTemperature {
                     _ => Self::Unknown,
                 }
             }
+        }
+    }
+}
+
+impl fmt::Display for ChainTemperature {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ChainTemperature::Unknown => write!(f, "???"),
+            ChainTemperature::Failed => write!(f, "Fail"),
+            ChainTemperature::Ok(t) => write!(f, "{:.0}°C", t),
         }
     }
 }
@@ -194,6 +205,22 @@ impl ChainState {
     }
 }
 
+impl fmt::Display for ChainState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ChainState::On { .. } => write!(f, "Starting"),
+            ChainState::Off => write!(f, "Off"),
+            ChainState::Running { temperature, .. } => write!(
+                f,
+                "{},{}",
+                temperature.local.to_string(),
+                temperature.remote.to_string()
+            ),
+            ChainState::Broken { .. } => write!(f, "Broken"),
+        }
+    }
+}
+
 /// Represent hashchains as registered within Monitor
 struct Chain {
     state: ChainState,
@@ -246,7 +273,7 @@ pub struct Config {
 #[derive(Debug, Clone)]
 pub struct ControlDecisionExplained {
     pub decision: ControlDecision,
-    pub reason: &'static str,
+    pub reason: String,
 }
 
 /// Output of the decision process
@@ -272,14 +299,14 @@ impl ControlDecision {
         if temp == ChainTemperature::Unknown {
             return ControlDecisionExplained {
                 decision: Self::UseFixedSpeed(fan::Speed::FULL_SPEED),
-                reason: "unknown temperature",
+                reason: "Fans full speed: unknown temperature".into(),
             };
         }
         match &fan_config.mode {
             FanControlMode::FixedSpeed(pwm) => {
                 return ControlDecisionExplained {
                     decision: Self::UseFixedSpeed(*pwm),
-                    reason: "user defined fan speed",
+                    reason: format!("User defined fan {}", *pwm),
                 };
             }
             FanControlMode::TargetTemperature(target_temp) => match temp {
@@ -290,7 +317,7 @@ impl ControlDecision {
                     if input_temp >= temp_config.hot_temp {
                         return ControlDecisionExplained {
                             decision: Self::UseFixedSpeed(fan::Speed::FULL_SPEED),
-                            reason: "temperature above HOT",
+                            reason: format!("Fans full speed: temperature {} above HOT", temp),
                         };
                     }
                     return ControlDecisionExplained {
@@ -298,7 +325,10 @@ impl ControlDecision {
                             target_temp: *target_temp,
                             input_temp,
                         },
-                        reason: "user requested PID",
+                        reason: format!(
+                            "Automatic fan control: input {} target {:.0}°C",
+                            temp, target_temp
+                        ),
                     };
                 }
             },
@@ -311,7 +341,7 @@ impl ControlDecision {
             FanControlMode::FixedSpeed(pwm) => {
                 return ControlDecisionExplained {
                     decision: Self::UseFixedSpeed(pwm),
-                    reason: "user defined fan speed",
+                    reason: format!("Fans to {} (user defined)", pwm),
                 };
             }
             FanControlMode::TargetTemperature(_) => {
@@ -319,7 +349,7 @@ impl ControlDecision {
                 // Let's make it non-fatal
                 return ControlDecisionExplained {
                     decision: Self::UseFixedSpeed(fan::Speed::FULL_SPEED),
-                    reason: "wrong configration - temp control off",
+                    reason: "wrong configuration - temp control off".into(),
                 };
             }
         }
@@ -339,14 +369,14 @@ impl ControlDecision {
                 ChainTemperature::Failed => {
                     return ControlDecisionExplained {
                         decision: Self::Shutdown,
-                        reason: "temperature readout FAILED",
+                        reason: "Shutdown: temperature readout FAILED".into(),
                     };
                 }
                 ChainTemperature::Ok(input_temp) => {
                     if input_temp >= temp_config.dangerous_temp {
                         return ControlDecisionExplained {
                             decision: Self::Shutdown,
-                            reason: "temperature above DANGEROUS",
+                            reason: format!("Shutdown: temperature {} above DANGEROUS", temp),
                         };
                     }
                 }
@@ -372,7 +402,10 @@ impl ControlDecision {
                 if num_fans_running < fan_config.min_fans {
                     return ControlDecisionExplained {
                         decision: Self::Shutdown,
-                        reason: "not enough fans",
+                        reason: format!(
+                            "Shutdown: not enough fans ({} < {})",
+                            num_fans_running, fan_config.min_fans
+                        ),
                     };
                 }
             }
@@ -381,7 +414,7 @@ impl ControlDecision {
             // This is only valid if `FanControl` is turned off
             ControlDecisionExplained {
                 decision: Self::Nothing,
-                reason: "no action",
+                reason: "control disabled".into(),
             }
         }
     }
@@ -535,7 +568,7 @@ impl Monitor {
 
     /// Set fan speed
     fn set_fan_speed(&self, inner: &mut MonitorInner, fan_speed: fan::Speed) {
-        info!("Monitor: setting fan to {:?}", fan_speed);
+        trace!("Monitor: setting fan to {:?}", fan_speed);
         inner.fan_control.set_speed(fan_speed);
         inner.current_fan_speed = Some(fan_speed);
     }
@@ -549,6 +582,7 @@ impl Monitor {
         let mut inner = self.inner.lock().await;
         let mut temperature_accumulator = TemperatureAccumulator::new();
         let mut miner_warming_up = false;
+        let mut chain_info_status = vec![];
         for chain in inner.chains.iter() {
             let mut chain = chain.lock().await;
             chain.state.tick(Instant::now());
@@ -562,7 +596,8 @@ impl Monitor {
                 self.shutdown(inner, reason).await;
                 return;
             }
-            info!("chain {}: {:?}", chain.hashboard_idx, chain.state);
+            trace!("Monitor: chain {}: {:?}", chain.hashboard_idx, chain.state);
+            chain_info_status.push(chain.state.to_string());
             temperature_accumulator.add_chain_temp(chain.state.get_temperature());
             miner_warming_up |= chain.state.is_warming_up(Instant::now());
         }
@@ -571,21 +606,30 @@ impl Monitor {
         // Read fans
         let fan_feedback = inner.fan_control.read_feedback();
         let num_fans_running = fan_feedback.num_fans_running();
-        info!(
+        trace!(
             "Monitor: fan={:?} num_fans={} acc.temp.={:?}",
-            fan_feedback, num_fans_running, input_temperature,
+            fan_feedback,
+            num_fans_running,
+            input_temperature,
         );
-
         // all right, temperature has been aggregated, decide what to do
         let decision_explained =
             ControlDecision::decide(&inner.config, num_fans_running, input_temperature);
-        info!("Monitor: {:?}", decision_explained);
+        trace!("Monitor: {:?}", decision_explained);
+        let status_line = format!(
+            "{} | {} | {}",
+            decision_explained.reason,
+            chain_info_status.join(" "),
+            fan_feedback.to_string(),
+        );
         match decision_explained.decision {
             ControlDecision::Shutdown => {
+                info!("Monitor: {}", status_line);
                 self.shutdown(inner, decision_explained.reason.into()).await;
                 return;
             }
             ControlDecision::UseFixedSpeed(fan_speed) => {
+                info!("Monitor: {} fan_{}", status_line, fan_speed);
                 self.set_fan_speed(&mut inner, fan_speed);
             }
             ControlDecision::UsePid {
@@ -599,11 +643,8 @@ impl Monitor {
                 }
                 inner.pid.set_target(target_temp.into());
                 let speed = inner.pid.update(input_temp.into());
-                info!(
-                    "Monitor: input={} target={} output={:?}",
-                    input_temp, target_temp, speed
-                );
                 self.set_fan_speed(&mut inner, speed);
+                info!("Monitor: {} fan_{}", status_line, speed);
             }
             ControlDecision::Nothing => {}
         }

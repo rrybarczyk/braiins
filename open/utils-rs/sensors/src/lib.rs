@@ -39,6 +39,8 @@
 mod tmp42x;
 mod tmp451;
 
+use std::fmt;
+
 use ii_async_i2c as i2c;
 
 use async_trait::async_trait;
@@ -89,6 +91,18 @@ impl From<Measurement> for Option<f32> {
         match m {
             Measurement::Ok(t) => Some(t),
             _ => None,
+        }
+    }
+}
+
+impl fmt::Display for Measurement {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Measurement::NotPresent => write!(f, "-"),
+            Measurement::InvalidReading | Measurement::OpenCircuit | Measurement::ShortCircuit => {
+                write!(f, "Err")
+            }
+            Measurement::Ok(t) => write!(f, "{:.0}°C", t),
         }
     }
 }
