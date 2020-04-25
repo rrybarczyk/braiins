@@ -129,8 +129,6 @@ impl From<Fans> for Dispatch {
 /// Basic temperature control settings
 #[derive(Serialize, PartialEq, Clone, Debug)]
 pub struct TunerChainStatus {
-    #[serde(rename = "TunerRunning")]
-    pub tuner_running: bool,
     #[serde(rename = "HashchainIndex")]
     pub hashchain_index: u32,
     #[serde(rename = "TuningStarted")]
@@ -145,6 +143,8 @@ pub struct TunerChainStatus {
     pub power_limit: u32,
     #[serde(rename = "ApproximatePowerConsumptionWatt")]
     pub approx_consumption: u32,
+    #[serde(rename = "TunerRunning")]
+    pub tuner_running: bool,
 }
 
 /// Basic temperature control settings
