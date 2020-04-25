@@ -98,6 +98,12 @@ const HALT_TIMEOUT: Duration = Duration::from_secs(30);
 /// Pre-computed PLL for quick lookup
 pub static PRECOMPUTED_PLL: OnceCell<bm1387::PllTable> = OnceCell::new();
 
+/// Number of attempts to try read temperature again if it doesn't look right
+const MAX_TEMP_REREAD_ATTEMPTS: usize = 3;
+
+/// Temperature difference that is considerd to be a "sudden temperature change"
+const MAX_SUDDEN_TEMPERATURE_JUMP: f32 = 12.0;
+
 /// Type representing plug pin
 #[derive(Clone)]
 pub struct PlugPin {
@@ -856,6 +862,18 @@ impl HashChain {
         }
     }
 
+    fn max_temp(t: sensor::Temperature) -> Option<f32> {
+        let local: Option<f32> = t.local.into();
+        let remote: Option<f32> = t.remote.into();
+        match local {
+            Some(t1) => match remote {
+                Some(t2) => Some(t1.max(t2)),
+                None => local,
+            },
+            None => remote,
+        }
+    }
+
     /// Monitor watchdog task.
     /// This task sends periodically ping to monitor task. It also tries to read temperature.
     async fn monitor_watchdog_temp_task(self: Arc<Self>) {
@@ -894,9 +912,13 @@ impl HashChain {
             error::Result::Ok(sensor) => sensor,
         };
 
+        // Compare temperature to previous to check if sudden temperature change occured
+        let mut last_max_temp: Option<f32> = None;
+        let mut try_again = MAX_TEMP_REREAD_ATTEMPTS;
+
         // "Watchdog" loop that pings monitor every some seconds
         loop {
-            // If we have temperature sensor, try to read it
+            // Read temperature sensor
             let temp = match sensor
                 .read_temperature()
                 .await
@@ -921,6 +943,34 @@ impl HashChain {
                     sensor::INVALID_TEMPERATURE_READING
                 }
             };
+
+            let max_temp = Self::max_temp(temp.clone());
+            // Check for weird temperatures
+            if try_again > 0 {
+                // Both previous and current temperature must exist
+                if let Some(max_t) = max_temp {
+                    if let Some(old_max_t) = last_max_temp {
+                        if (max_t - old_max_t).abs() >= MAX_SUDDEN_TEMPERATURE_JUMP {
+                            warn!(
+                                "Hashchain {}: Temperature suddenly jumped from {} to {}, reading again",
+                                self.hashboard_idx, old_max_t, max_t
+                            );
+
+                            // Do not send anything out yet, just wait a bit and then try to read
+                            // the temperature again
+                            delay_for(Duration::from_millis(200)).await;
+                            try_again -= 1;
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            // Update last temp and reset tries
+            if max_temp.is_some() {
+                last_max_temp = max_temp;
+            }
+            try_again = MAX_TEMP_REREAD_ATTEMPTS;
 
             // Broadcast
             temperature_sender
