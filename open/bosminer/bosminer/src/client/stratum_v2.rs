@@ -501,9 +501,12 @@ impl StratumConnectionHandler {
 
         self.status = None;
         response_msg.accept(self).await;
-        self.status
-            .take()
-            .unwrap_or(Err("Unexpected response for stratum open channel".into()))
+        self.status.take().unwrap_or(Err(format!(
+            "Unexpected response for stratum open channel: {:?}",
+            response_msg.header
+        )
+        .as_str()
+        .into()))
     }
 
     async fn connect(&self) -> error::Result<(DynFramedSink, DynFramedStream)> {
