@@ -197,18 +197,18 @@ impl Handle {
 
     #[inline]
     fn start(&self) {
-        if self.node.status().initiate_starting() {
-            // The client can be started safely
-            self.node.clone().start();
-        }
+        // Safely start the client
+        self.node
+            .status()
+            .initiate_starting(|| self.node.clone().start());
     }
 
     #[inline]
     fn stop(&self) {
-        if self.node.status().initiate_stopping() {
-            // The client can be stopped safely
-            self.node.clone().stop();
-        }
+        // Safely stop the client
+        self.node
+            .status()
+            .initiate_stopping(|| self.node.clone().stop());
     }
 
     /// Check if current state of the client is enabled

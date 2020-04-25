@@ -29,7 +29,7 @@ use ii_logging::macros::*;
 use crate::error;
 use crate::hal;
 use crate::job;
-use crate::node;
+use crate::node::{self, Client};
 use crate::stats;
 use crate::sync;
 use crate::work;
@@ -936,6 +936,11 @@ impl StratumClient {
             // TODO: Count as a discarded solution?
             self.solution_receiver.lock().await.flush();
             self.solutions.lock().await.clear();
+            // Flush all stop events before stopping!
+            while let Ok(Some(_)) = stop_receiver.try_next() {}
+            // NOTE: No new stop event cannot be received in this stopping process (another one can
+            // be received after calling `can_stop` method where state can be restarted to starting
+            // process)
 
             if self.status.can_stop() {
                 // NOTE: it is not safe to add here any code!
@@ -970,7 +975,7 @@ impl StratumClient {
         }
         drop(connection_details);
         // Ignore the result
-        self.status.initiate_stopping();
+        self.status.initiate_stopping(|| self.stop());
     }
 }
 
