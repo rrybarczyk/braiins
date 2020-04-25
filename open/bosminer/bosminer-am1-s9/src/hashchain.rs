@@ -29,7 +29,7 @@ pub use frequency::FrequencySettings;
 
 use ii_logging::macros::*;
 
-use ii_sensors as sensor;
+use ii_sensors::{self as sensor, Measurement};
 
 use std::fmt;
 use std::sync::Arc;
@@ -103,6 +103,9 @@ const MAX_TEMP_REREAD_ATTEMPTS: usize = 3;
 
 /// Temperature difference that is considerd to be a "sudden temperature change"
 const MAX_SUDDEN_TEMPERATURE_JUMP: f32 = 12.0;
+
+/// Maximum number of errors before temperature sensor is disabled
+const MAX_SENSOR_ERRORS: usize = 10;
 
 /// Type representing plug pin
 #[derive(Clone)]
@@ -906,7 +909,10 @@ impl HashChain {
             .map_err(|e| e.into())
         {
             error::Result::Err(e) => {
-                error!("Sensor probing failed: {}", e);
+                error!(
+                    "Hashchain {}: Sensor probing failed: {}",
+                    self.hashboard_idx, e
+                );
                 return self.no_sensor_task().await;
             }
             error::Result::Ok(sensor) => sensor,
@@ -915,6 +921,7 @@ impl HashChain {
         // Compare temperature to previous to check if sudden temperature change occured
         let mut last_max_temp: Option<f32> = None;
         let mut try_again = MAX_TEMP_REREAD_ATTEMPTS;
+        let mut error_counter = 0.0;
 
         // "Watchdog" loop that pings monitor every some seconds
         loop {
@@ -930,8 +937,8 @@ impl HashChain {
             {
                 error::Result::Ok(temp) => {
                     info!(
-                        "Hashchain {}: Measured temperature: {:?}",
-                        self.hashboard_idx, temp
+                        "Hashchain {}: Measured temperature: {:?}, errors average: {:.1}",
+                        self.hashboard_idx, temp, error_counter
                     );
                     temp
                 }
@@ -943,6 +950,12 @@ impl HashChain {
                     sensor::INVALID_TEMPERATURE_READING
                 }
             };
+            match temp.remote {
+                Measurement::OpenCircuit
+                | Measurement::ShortCircuit
+                | Measurement::InvalidReading => error_counter += 1.0,
+                _ => {}
+            }
 
             let max_temp = Self::max_temp(temp.clone());
             // Check for weird temperatures
@@ -955,6 +968,7 @@ impl HashChain {
                                 "Hashchain {}: Temperature suddenly jumped from {} to {}, reading again",
                                 self.hashboard_idx, old_max_t, max_t
                             );
+                            error_counter += 1.0;
 
                             // Do not send anything out yet, just wait a bit and then try to read
                             // the temperature again
@@ -965,6 +979,18 @@ impl HashChain {
                     }
                 }
             }
+
+            // If there's too many errors, just disable this sensor
+            if error_counter >= MAX_SENSOR_ERRORS as f64 {
+                error!(
+                    "Hashchain {}: Too many sensor errors, disabling sensor",
+                    self.hashboard_idx
+                );
+                return self.no_sensor_task().await;
+            }
+            // Decay 30% of errors an hour: update is is every 5 seconds, so one hour is
+            // `error_counter * 0.9995^(3600/5) = error_counter * 0.70`
+            error_counter *= 0.9995;
 
             // Update last temp and reset tries
             if max_temp.is_some() {
