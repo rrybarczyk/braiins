@@ -91,11 +91,14 @@ impl ChainTemperature {
     fn from_s9_sensor(temp: sensor::Temperature) -> Self {
         match temp.remote {
             // remote is chip temperature
-            Measurement::Ok(t) => Self::Ok(t),
+            Measurement::Ok(t_remote) => match temp.local {
+                Measurement::Ok(t_local) => Self::Ok(t_remote.max(t_local)),
+                _ => Self::Ok(t_remote),
+            },
             _ => {
                 // fake chip temperature from local (PCB) temperature
                 match temp.local {
-                    Measurement::Ok(t) => Self::Ok(t + 15.0),
+                    Measurement::Ok(t_local) => Self::Ok(t_local + 15.0),
                     _ => Self::Unknown,
                 }
             }
