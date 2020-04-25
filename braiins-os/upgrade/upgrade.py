@@ -148,10 +148,17 @@ def main(args):
         else:
             psu_power_limit = args.psu_power_limit or 'default'
 
+        if args.keep_hostname:
+            keep_hostname = 'yes'
+        elif args.no_keep_hostname:
+            keep_hostname = 'no'
+        else:
+            # keep only user defined hostname and skip factory one (default behaviour)
+            keep_hostname = 'cond'
+
         pool_user = args.pool_user or ''
         keep_network = 'no' if args.no_keep_network else 'yes'
         keep_pools = 'no' if args.no_keep_pools else 'yes'
-        keep_hostname = 'yes' if args.keep_hostname else 'no'
         dry_run = 'yes' if args.dry_run else 'no'
 
         # run stage1 upgrade process
@@ -209,8 +216,10 @@ if __name__ == "__main__":
                         help='do not keep miner network configuration (use DHCP)')
     parser.add_argument('--no-keep-pools', action='store_true',
                         help='do not keep miner pool configuration')
+    parser.add_argument('--no-keep-hostname', action='store_true',
+                        help='do not keep miner hostname and generate new one based on MAC')
     parser.add_argument('--keep-hostname', action='store_true',
-                        help='keep miner hostname')
+                        help='force to keep any miner hostname')
     parser.add_argument('--no-wait', action='store_true',
                         help='do not wait until system is fully upgraded')
     parser.add_argument('--dry-run', action='store_true',
