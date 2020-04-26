@@ -38,6 +38,9 @@ use std::task::{Context, Poll};
 use crate::error;
 
 /// Wrapper that extablishes translated V2->V1 connection
+/// Note: explicitely derive Copy, so that the instance can be consumed and moved into the future.
+/// All is really being copied is the public key
+#[derive(Copy, Clone, Debug)]
 pub(crate) struct Connector {
     /// Options required by the `TranslationHandler`
     translation_options: V2ToV1TranslationOptions,
@@ -59,6 +62,8 @@ impl Connector {
         self,
         connection: TcpStream,
     ) -> error::Result<(v2::DynFramedSink, v2::DynFramedStream)> {
+        trace!("Stratum V2 noise connector: {:?}, {:?}", connection, self);
+
         let v1_framed_connection = ii_wire::Connection::<v1::Framing>::new(connection).into_inner();
 
         let (translation_handler, v2_translation_receiver, v2_translation_sender) =
@@ -72,6 +77,12 @@ impl Connector {
             Pin::new(Box::new(V2ConnectorSender::new(v2_translation_sender))),
             V2ConnectorReceiver::new(v2_translation_receiver).boxed(),
         ))
+    }
+
+    /// Converts the connector into a closure that provides the connect future for later
+    /// evaluation once an actual connection has been established
+    pub fn into_connector_fn(self) -> super::DynConnectFn {
+        Box::new(move |connection| self.connect(connection).boxed())
     }
 }
 
@@ -215,7 +226,8 @@ impl TranslationHandler {
         loop {
             select! {
                 // Receive V1 frame and translate it to V2 message
-                v1_frame = self.v1_conn.next().timeout(super::StratumClient::EVENT_TIMEOUT).fuse()
+                v1_frame = self.v1_conn.next().timeout(super::super::StratumClient::EVENT_TIMEOUT)
+                .fuse()
                 => {
                     match v1_frame {
                         Ok(Some(v1_frame)) => {
@@ -250,7 +262,7 @@ impl TranslationHandler {
                             // block indefinitely and the above timeout for v1_conn wouldn't
                             // do anything. Besides this, we don't want to wait with system time
                             // out in case the upstream connection just hangs
-                            .timeout(super::StratumClient::EVENT_TIMEOUT)
+                            .timeout(super::super::StratumClient::EVENT_TIMEOUT)
                             .await
                             // Unwrap timeout and actual sending error
                             .map_err(|e| "V1 send timeout")??,

@@ -21,8 +21,8 @@
 // contact us at opensource@braiins.com.
 
 // Sub-modules with client implementation
+pub mod connectors;
 pub mod telemetry;
-mod v1;
 
 use ii_logging::macros::*;
 
@@ -49,7 +49,6 @@ use ii_async_compat::select;
 
 use std::collections::VecDeque;
 use std::fmt;
-use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Mutex as StdMutex;
 use std::sync::{Arc, Weak};
@@ -62,12 +61,11 @@ use ii_stratum::v2::messages::{
     SubmitSharesSuccess,
 };
 use ii_stratum::v2::types::*;
+use ii_stratum::v2::{build_message_from_frame, extensions, Handler};
 use ii_stratum::v2::{
-    self,
     framing::{Framing, Header},
     DynFramedSink, DynFramedStream,
 };
-use ii_stratum::v2::{build_message_from_frame, extensions, Handler};
 
 use std::collections::HashMap;
 
@@ -76,8 +74,8 @@ const VERSION_MASK: u32 = 0x1fffe000;
 
 #[derive(Debug, Clone)]
 pub struct ConnectionDetails {
-    /// TODO temporary field that denotes the protocol, it will be replaced by a `Connector`
-    /// object that will have the information about a specific protocol already built-in
+    /// Protocol provides valuable diagnostic information as stratum_v2 operates in multiple
+    /// modes including V2->V1 translation
     pub protocol: ClientProtocol,
     pub user: String,
     pub host: String,
@@ -516,31 +514,7 @@ impl StratumConnectionHandler {
         // Attempt only once to connect (as the stratum client is being managed externally)
         let connection = client.next().await?;
 
-        // TODO this will be replaced by a 'connector' that will be set when building stratum
-        // client instance
-        // TODO rename to client_framed_connection
-        let client_framed_stream = match connection_details.protocol {
-            // V1 connector
-            ClientProtocol::StratumV1 => {
-                let connector = v1::Connector::new(false);
-                return connector.connect(connection).await;
-            }
-            // V2 secure connector
-            ClientProtocol::StratumV2(upstream_authority_public_key) => {
-                let noise_initiator =
-                    v2::noise::Initiator::new(upstream_authority_public_key.into_inner());
-                // Successful noise initiator handshake results in a stream/sink for V2 frames
-                noise_initiator.connect(connection).await?
-            }
-            // V2 insecure connector
-            ClientProtocol::StratumV2Insecure => {
-                ii_wire::Connection::<v2::Framing>::new(connection).into_inner()
-            }
-            // Anything else is considered a bug
-            _ => panic!("BUG: client supports only stratum V2 protocols!"),
-        };
-        let (sink, stream) = client_framed_stream.split();
-        Ok((Pin::new(Box::new(sink)), stream.boxed()))
+        (self.client.get_connector)(connection).await
     }
 
     /// Starts mining session and provides the initial target negotiated by the upstream endpoint
@@ -632,7 +606,7 @@ pub type ExtensionChannelFromStratumReceiver = mpsc::Receiver<ExtensionChannelMs
 /// Sender for Stratum --> Remote direction (stratum client end)
 pub type ExtensionChannelFromStratumSender = mpsc::Sender<ExtensionChannelMsg>;
 
-#[derive(Debug, ClientNode)]
+#[derive(ClientNode)]
 pub struct StratumClient {
     connection_details: Arc<StdMutex<ConnectionDetails>>,
     backend_info: Option<hal::BackendInfo>,
@@ -653,6 +627,9 @@ pub struct StratumClient {
     /// Frames intended for the specified extension will be forwarded into this channel (wrapped
     /// into ExtensionChannelMsg
     extension_channel_sender: Mutex<ExtensionChannelFromStratumSender>,
+    // Each protocol scheme provides a dedicated connector. This closure allows building the
+    // connector future at a time when the physical TCP connection is established
+    get_connector: connectors::DynConnectFn,
 }
 
 impl StratumClient {
@@ -698,6 +675,7 @@ impl StratumClient {
 
     pub fn new(
         connection_details: ConnectionDetails,
+        get_connector: connectors::DynConnectFn,
         backend_info: Option<hal::BackendInfo>,
         solver: job::Solver,
         channel: Option<(
@@ -721,6 +699,7 @@ impl StratumClient {
 
         Self {
             connection_details: Arc::new(StdMutex::new(connection_details)),
+            get_connector,
             backend_info,
             status: Default::default(),
             client_stats: Default::default(),
@@ -1037,5 +1016,16 @@ impl fmt::Display for StratumClient {
             "{}://{}@{}",
             connection_details.protocol, connection_details.host, connection_details.user
         )
+    }
+}
+
+/// TODO: temporary custom Debug implementation that omits most of the fields. The reason is that
+/// the derived implementation cannot cover the DynConnectFn
+impl fmt::Debug for StratumClient {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let connection_details = self.connection_details();
+        f.debug_struct("StratumClient")
+            .field("connection_details", &connection_details)
+            .finish()
     }
 }
