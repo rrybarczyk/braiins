@@ -651,21 +651,21 @@ impl StratumClient {
         let (sender_to_client, receiver_to_client) = mpsc::channel(1);
 
         tokio::spawn(async move {
-            info!(
+            trace!(
                 "Stratum extension: starting dummy task[{:?}]... ",
                 connection_details
             );
             // Make sure the sender is moved inside the dummy task to prevent it from being
             // dropped. Otherwise the receiver_to_client would immediately indicate end of stream
             let _sender_to_client = sender_to_client;
-            //
             while let Some(message) = receiver_from_client.next().await {
-                info!(
+                trace!(
                     "Stratum extension: dummy task[{:?}] received: {:?},",
-                    connection_details, message
+                    connection_details,
+                    message
                 );
             }
-            info!(
+            trace!(
                 "Stratum extension: dummy task[{:?}] terminated",
                 connection_details
             );
@@ -689,13 +689,8 @@ impl StratumClient {
         // or populate it with dummy endpoints. That way we can handle the endpoints uniformly
         // regardless whether they are configured or not (see `main_loop()`)
         // that would handle all events regards
-        let (extension_channel_receiver, extension_channel_sender) = channel.unwrap_or_else(|| {
-            info!(
-                "V2: starting dummy task for client: {:?}",
-                connection_details
-            );
-            Self::start_dummy_extension_task(connection_details.clone())
-        });
+        let (extension_channel_receiver, extension_channel_sender) =
+            channel.unwrap_or_else(|| Self::start_dummy_extension_task(connection_details.clone()));
 
         Self {
             connection_details: Arc::new(StdMutex::new(connection_details)),
