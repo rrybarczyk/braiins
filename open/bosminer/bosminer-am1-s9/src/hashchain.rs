@@ -988,7 +988,7 @@ impl HashChain {
                 );
                 return self.no_sensor_task().await;
             }
-            // Decay 30% of errors an hour: update is is every 5 seconds, so one hour is
+            // Decay 30% of errors an hour: update it every TEMP_UPDATE_INTERVAL seconds, so one hour is
             // `error_counter * 0.9995^(3600/5) = error_counter * 0.70`
             error_counter *= 0.9995;
 
