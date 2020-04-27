@@ -73,6 +73,8 @@ impl StatusMonitor {
         self.status.load(Ordering::Relaxed)
     }
 
+    /// `f` - closure that is 'run' to atomically perform actual start operation on an object if the
+    /// internal state allows it
     pub fn initiate_starting(&self, f: impl FnOnce()) {
         let _sync = self.atomic_start_stop();
 
@@ -166,6 +168,8 @@ impl StatusMonitor {
         true
     }
 
+    /// `f` - closure that is 'run' to atomically perform actual stop operation on an object
+    /// if the internal state allows it
     pub fn initiate_stopping(&self, f: impl FnOnce()) {
         let _sync = self.atomic_start_stop();
 
