@@ -860,6 +860,11 @@ impl StratumClient {
             .map_err(|_| error::ErrorKind::General("Connection timeout".to_string()).into())
         {
             Ok(Ok((framed_sink, mut framed_stream))) => {
+                info!(
+                    "Connected {} to: {}",
+                    connection_details.protocol,
+                    connection_details.get_host_and_port()
+                );
                 let framed_sink = Arc::new(Mutex::new(framed_sink));
                 match connection_handler
                     .init_mining_session(&mut framed_stream, framed_sink.clone())
@@ -887,7 +892,7 @@ impl StratumClient {
                 }
             }
             Ok(Err(e)) | Err(e) => {
-                info!(
+                error!(
                     "Failed to connect to {}, user={} {:?}",
                     host_and_port, user, e
                 );
