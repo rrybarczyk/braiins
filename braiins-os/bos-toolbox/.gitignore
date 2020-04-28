@@ -1,0 +1,6 @@
+bos-toolbox.spec
+bos-version.txt
+dist/
+build/
+braiins-os*
+Antminer*
