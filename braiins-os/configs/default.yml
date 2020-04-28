@@ -155,7 +155,7 @@ feeds:
 
 uenv:
   # boot Linux from SD instead of NAND
-  mac: yes
+  mac: no
   # reset firmware to factory settings
   factory_reset: no
   # use for factory reset images from SD
