@@ -1,21 +1,19 @@
 ## Overview
 
-This release covers mostly user facing issues, installation/deinstalation difficulties and 1 major problem with I2C controller on S9's. Also, we now have nightly builds that are easy to enable via **bos** tool.
+This release covers mostly user facing issues, installation/uninstallation pain points, and 1 major problem with I2C controller on S9s. Also, we now have nightly builds that are easy to enable via the **bos** tool.
 
 ## All mining hardware types
 
 - [feature] support for reconnect - we have implemented support for `client.reconnect` (stratum V1) and reconnect message for V2
-- [feature] installation/deinstallation (aka **upgrade2bos** and **restore2factory**) process (transition from factory firmware to Braiins OS or vica versa) has been improved:
+- [feature] installation/uninstallation process (aka **upgrade2bos** for transitioning from factory firmware to Braiins OS and **restore2factory** for reverting back to factory firmware) has been improved:
   - [feature] custom pool user (`--pool-user`) can be set on command line
-  - [feature] pool settings from the factory firmware are now automatically being migrated to BOSminer configuration. Migration can be disabled by specifying (`--no-keep-pools`)
-  - [feature] we now provide binary form of **upgrade2bos** (based on pyinstaller) that contains the latest Braiins OS installation image
-  - [feature] similarly, **restore2factory** (based on pyinstaller) is now available in binary form and doesn't require any longer downloading/finding out the correct factory firmware.
-  - [feature] disk space and time consuming backup of the original firmware is now disabled by default (can be enabled by `--backup`)
-  - [feature] keeping host name while performing first time install is now driving by 2 options `--keep-hostname` and `--no-keep-hostname` allowing to force override and automatic hostname generation based on MAC address
+  - [feature] pool settings from the factory firmware are now automatically being migrated to the BOSminer configuration. Migration can be disabled by specifying (`--no-keep-pools`)
+  - [feature] time and disk space consuming backup of the original firmware is now disabled by default (can be enabled by `--backup`)
+  - [feature] keeping the host name while performing a first-time install is now driven by 2 options `--keep-hostname` and `--no-keep-hostname` allowing users to force override and automatic hostname generation based on MAC address
 - [feature] support for enabling/disabling nightly builds has been integrated into **bos** utility (and its legacy **miner** counterpart).
-- [feature] system now provides **logs** covering **longer timespan** of **BOSminer** operation due to enabling **log rotation** and compression of '/var/log/syslog.old' when it is bigger than 32 KiB
-- [bug] SD card image now contains slushpool authority public key that was missing
-- [bug] rejection rate is now correctly being displayed
+- [feature] system now provides **logs** covering **longer timespan** of **BOSminer** operation due to enabling **log rotation** and compression of '/var/log/syslog.old' when it is bigger than 32 kB
+- [bug] SD card image now contains the Slush Pool authority public key that was missing
+- [bug] rejection rate is now being displayed correctly 
 - [bug] unknown stratum V1 messages received from the server are now being logged for diagnostics
 
 ## Antminer S9
