@@ -204,10 +204,7 @@ def main(args):
         wait_for_port(args.hostname, 80, REBOOT_DELAY)
 
 
-if __name__ == "__main__":
-    # execute only if run as a script
-    parser = argparse.ArgumentParser()
-
+def build_arg_parser(parser):
     parser.add_argument('hostname',
                         help='hostname of miner with original firmware')
     parser.add_argument('--backup', action='store_true',
@@ -233,6 +230,11 @@ if __name__ == "__main__":
     parser.add_argument('--post-upgrade', nargs='?',
                         help='path to directory with stage3.sh script')
 
+
+if __name__ == "__main__":
+    # execute only if run as a script
+    parser = argparse.ArgumentParser()
+    build_arg_parser(parser)
     # parse command line arguments
     args = parser.parse_args(sys.argv[1:])
 

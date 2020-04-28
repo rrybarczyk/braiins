@@ -113,10 +113,7 @@ def main(args):
                 restore_firmware(args, ssh, backup_dir)
 
 
-if __name__ == "__main__":
-    # execute only if run as a script
-    parser = argparse.ArgumentParser()
-
+def build_arg_parser(parser):
     parser.add_argument('backup', nargs='?',
                         help='path to directory or tgz file with data for miner restore')
     parser.add_argument('hostname',
@@ -124,6 +121,11 @@ if __name__ == "__main__":
 
     platform.add_restore_arguments(parser)
 
+
+if __name__ == "__main__":
+    # execute only if run as a script
+    parser = argparse.ArgumentParser()
+    build_arg_parser(parser)
     # parse command line arguments
     args = parser.parse_args(sys.argv[1:])
 

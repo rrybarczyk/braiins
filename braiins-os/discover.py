@@ -425,11 +425,9 @@ def get_passwords(passwords_path):
 
 class CommandManager:
     def __init__(self):
-        self._argv = None
         self._args = None
 
-    def set_args(self, argv, args):
-        self._argv = argv
+    def set_args(self, args):
         self._args = args
 
     def scan(self):
@@ -448,11 +446,13 @@ class CommandManager:
             ip_addr, mac_addr = m[0].decode('utf-8').split(',')
             print(self._args.format.format(IP=ip_addr, MAC=mac_addr))
 
+def call_command(command, command_method, args):
+    command.set_args(args)
+    command_method()
 
-def main(argv):
+def build_arg_parser(parser):
     command = CommandManager()
 
-    parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers()
     subparsers.required = True
     subparsers.dest = 'command'
@@ -460,7 +460,7 @@ def main(argv):
     # create the parser for the "scan" command
     subparser = subparsers.add_parser('scan',
                                       help="actively scan provided range of address")
-    subparser.set_defaults(func=command.scan)
+    subparser.set_defaults(func=lambda args: call_command(command, command.scan, args))
     subparser.add_argument('hostname', nargs='+',
                            help='list of hostnames or subnet range')
     subparser.add_argument('--passwords',
@@ -471,24 +471,27 @@ def main(argv):
     # create the parser for the "listen" command
     subparser = subparsers.add_parser('listen',
                                       help="listen for incoming broadcast from devices")
-    subparser.set_defaults(func=command.listen)
+    subparser.set_defaults(func=lambda args: call_command(command, command.listen, args))
     subparser.add_argument('--format', action="store",
                            default="IP='{IP}', MAC='{MAC}'",
                            help="change default formatting string for device information; "
                                 "the tags '{IP}' and '{MAC}' will be replaced with actual data")
 
-    # parse command line arguments
-    args = parser.parse_args(argv)
+def main(args):
     # set arguments
-    command.set_args(argv, args)
     # call sub-command
-    args.func()
+    args.func(args)
 
 
 if __name__ == "__main__":
     # execute only if run as a script
+    parser = argparse.ArgumentParser()
+    build_arg_parser(parser)
+    # parse command line arguments
+    args = parser.parse_args(sys.argv[1:])
+
     try:
-        main(sys.argv[1:])
+        main(args)
     except KeyboardInterrupt:
         print()
         pass
