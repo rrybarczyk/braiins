@@ -131,10 +131,10 @@ impl From<Fans> for Dispatch {
 pub struct TunerChainStatus {
     #[serde(rename = "HashchainIndex")]
     pub hashchain_index: u32,
-    #[serde(rename = "TuningStarted")]
-    pub tuning_started: Time,
-    #[serde(rename = "StageStarted")]
-    pub stage_started: Time,
+    #[serde(rename = "TuningElapsed")]
+    pub tuning_elapsed: Time,
+    #[serde(rename = "StageElapsed")]
+    pub stage_elapsed: Time,
     #[serde(rename = "Status")]
     pub status: String,
     #[serde(rename = "Iteration")]
