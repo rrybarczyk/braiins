@@ -13,7 +13,13 @@ EMBEDDED_BOS_RELEASE=${1%.tar.gz}
 echo $EMBEDDED_BOS_RELEASE > bos-version.txt
 tar xvzf $1
 
-virtualenv --python=/usr/bin/python3 .bos-toolbox-env && source .bos-toolbox-env/bin/activate && python3 -m pip install -r requirements.txt
+virtualenv --python=/usr/bin/python3 .bos-toolbox-env
+source .bos-toolbox-env/bin/activate
+
+# Choose the right requirementes file based on interpret major/minor
+# version. This split is required by asyncssh
+PYTHON_VER=`python -c 'import sys; print(str(sys.version_info[0])+"."+str(sys.version_info[1]))'`
+python3 -m pip install -r requirements/python${PYTHON_VER}.txt
 
 if [ x$MSYSTEM = xMINGW64 ]; then
     PYINST_PATH_SEP=';'
