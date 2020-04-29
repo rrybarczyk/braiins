@@ -225,7 +225,7 @@ def create_bitmain_config(ssh, tmp_dir):
         except subprocess.CalledProcessError:
             net_hostname = ssh_run(ssh, 'cat', '/proc/sys/kernel/hostname')
         if net_hostname == get_default_hostname(mac):
-            # do not restore bOS default hostname
+            # do not restore BOS default hostname
             net_hostname = bitmain_hostname
         stream.write('hostname={}\n'.format(net_hostname).encode())
         stream.write('dhcp=true\n'.encode())
@@ -296,9 +296,12 @@ def add_restore_arguments(parser):
     if getattr(sys, 'frozen', False):
         default_factory_fw = os.path.join(get_data_root_path(),
                                           'Antminer-S9-all-201812051512-autofreq-user-Update2UBI-NF.tar.gz')
-        print("Using default factory firmware to: {}".format(default_factory_fw))
+        default_factory_fw_help = " (default: {})".format(os.path.basename(
+            default_factory_fw))
     else:
         default_factory_fw = None
+        default_factory_fw_help = ""
 
     parser.add_argument('--factory-image', default=default_factory_fw,
-                        help='path/url to original firmware upgrade image')
+                        help='path/url to original firmware upgrade image{}'.format(
+                            default_factory_fw_help))
