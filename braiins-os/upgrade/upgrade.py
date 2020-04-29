@@ -26,6 +26,8 @@ import argparse
 import subprocess
 import tempfile
 import tarfile
+import csv
+from getpass import getpass
 import sys
 import os
 
@@ -101,8 +103,30 @@ def main(args):
         check_stage3_path(STAGE3_BUILTIN_DIR)
         stage3_builtin_path = STAGE3_BUILTIN_DIR
 
-    print("Connecting to remote host...")
-    with SSHManager(args.hostname, USERNAME, PASSWORD) as ssh:
+    if args.batch:
+        try:
+            hosts = [row[0] for row in csv.reader(open(args.batch))]
+        except Exception as ex:
+            sys.exit("Invalid input file: %s (%s)" % (args.batch, ex))
+        if hosts and hosts[0] == "host":    # possibly skip csv header row
+            hosts = hosts[1:]
+
+        # user is not handled at all since we need root
+        # ssh wrapper may ask for password based on it's own logic, we just provide default
+        if args.install_password:
+            password = args.install_password
+        else:
+            password = getpass('Default password: ') or PASSWORD
+
+        for host in hosts:
+            install(args, host, USERNAME, password, stage3_user_path, stage3_builtin_path)
+    else:
+        install(args, args.hostname, USERNAME, args.install_password or PASSWORD, stage3_user_path, stage3_builtin_path)
+
+
+def install(args, host, username, password, stage3_user_path, stage3_builtin_path):
+    print("Connecting to %s..." % host)
+    with SSHManager(host, username, password) as ssh:
         # check compatibility of remote server
         check_compatibility(ssh)
 
@@ -185,7 +209,7 @@ def main(args):
             if args.dry_run:
                 cleanup_system(ssh)
                 print('Dry run of upgrade was successful!')
-                raise UpgradeStop
+                return
 
             for line in stdout.readlines():
                 print(line, end='')
@@ -201,12 +225,15 @@ def main(args):
         print()
         print('Wait for 120 seconds before the system becomes fully operational!')
     else:
-        wait_for_port(args.hostname, 80, REBOOT_DELAY)
+        wait_for_port(host, 80, REBOOT_DELAY)
 
 
 def build_arg_parser(parser):
-    parser.add_argument('hostname',
+    parser_sources = parser.add_mutually_exclusive_group(required=True)
+    parser_sources.add_argument('hostname', nargs='?',
                         help='hostname of miner with original firmware')
+    parser_sources.add_argument('--batch',
+                        help='path to file with list of hosts to install to')
     parser.add_argument('--backup', action='store_true',
                         help='do miner backup before upgrade')
     parser.add_argument('--no-nand-backup', action='store_true',
@@ -229,6 +256,9 @@ def build_arg_parser(parser):
                         help='do all upgrade steps without actual upgrade')
     parser.add_argument('--post-upgrade', nargs='?',
                         help='path to directory with stage3.sh script')
+    parser.add_argument('--install-password',
+                        help='ssh password for installation')
+
 
 
 if __name__ == "__main__":
@@ -240,6 +270,9 @@ if __name__ == "__main__":
 
     try:
         main(args)
+    except (KeyboardInterrupt):
+        print()
+        sys.exit(1)
     except SSHError as e:
         print(str(e))
         sys.exit(1)

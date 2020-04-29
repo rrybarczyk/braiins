@@ -63,6 +63,9 @@ if __name__ == '__main__':
 
     try:
         args.func(args)
+    except KeyboardInterrupt:
+        print()
+        sys.exit(1)
     except SSHError as e:
         print(str(e))
         sys.exit(1)

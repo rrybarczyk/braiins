@@ -9,7 +9,7 @@ set -e
     exit 1
 }
 
-EMBEDDED_BOS_RELEASE=${1%.tar.gz}
+EMBEDDED_BOS_RELEASE=$(basename ${1%.tar.gz})
 echo $EMBEDDED_BOS_RELEASE > bos-version.txt
 tar xvzf $1
 
