@@ -854,14 +854,14 @@ impl HashChain {
     /// This task just pings watchdog with no sensor readings
     async fn no_sensor_task(&self) {
         loop {
-            delay_for(bosminer_antminer::monitor::TEMP_UPDATE_INTERVAL).await;
-
             // Send heartbeat to monitor with "unknown" temperature
             self.monitor_tx
                 .unbounded_send(monitor::Message::Running(
                     sensor::INVALID_TEMPERATURE_READING,
                 ))
                 .expect("send failed");
+
+            delay_for(bosminer_antminer::monitor::TEMP_UPDATE_INTERVAL).await;
         }
     }
 
