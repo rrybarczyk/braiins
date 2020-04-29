@@ -245,7 +245,8 @@ impl StratumEventHandler {
                 return;
             }
         }
-        warn!(
+        // FIXME: Change trace! to warn! after proper implementation of sequence number
+        trace!(
             "Stratum: last accepted solution #{} hasn't been found!",
             success_msg.last_seq_num
         );
