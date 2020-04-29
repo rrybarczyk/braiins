@@ -28,6 +28,7 @@ import sys
 import upgrade2bos
 import restore2factory
 import discover
+import multiconfiger
 
 from upgrade.platform import PlatformStop
 from upgrade.ssh import SSHError
@@ -55,7 +56,7 @@ if __name__ == '__main__':
         'how to use it',
     )
 
-    for t in [upgrade2bos, discover, restore2factory]:
+    for t in [upgrade2bos, discover, restore2factory, multiconfiger]:
         add_tool(t)
 
     # parse command line arguments
