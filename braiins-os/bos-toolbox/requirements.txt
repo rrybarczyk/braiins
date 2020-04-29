@@ -1,4 +1,4 @@
 progress==1.2
 Paramiko==2.4.2
 PyInstaller==3.6
-asyncssh==2.2.1
+asyncssh==1.9
