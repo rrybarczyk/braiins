@@ -57,10 +57,17 @@ if __name__ == '__main__':
     )
 
     for t in [upgrade2bos, discover, restore2factory, multiconfiger]:
-        add_tool(t)
+        add_tool(subparsers, t)
 
     # parse command line arguments
     args = parser.parse_args(sys.argv[1:])
+
+    # Python3 workaround https://bugs.python.org/issue16308
+    try:
+        func = args.func
+    except AttributeError:
+        parser.error('too few arguments')
+        sys.exit(1)
 
     try:
         args.func(args)
