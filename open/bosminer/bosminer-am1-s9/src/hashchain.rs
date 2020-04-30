@@ -386,7 +386,7 @@ impl HashChain {
     /// This method sets work time so it's fast enough for `new_freq`
     async fn set_work_time(&self, new_freq: usize) {
         let new_work_time = self.calculate_work_time(new_freq);
-        info!("Using work time: {} for freq {}", new_work_time, new_freq);
+        debug!("Using work time: {} for freq {}", new_work_time, new_freq);
         self.common_io.set_ip_core_work_time(new_work_time);
     }
 
