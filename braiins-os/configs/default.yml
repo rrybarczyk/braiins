@@ -36,10 +36,8 @@ net:
 build:
   # name of subdirectory in the build directory
   name: '{target}'
-  # suffix added to firmware version
-  version_suffix: -stable
   # record used in feeds to distinguish current build
-  feeds_record: bos_firmware_rc
+  feeds_record: bos_firmware
   # file with default OpenWrt configuration
   config: defaults/release.conf
   # file with list of packages for build images
@@ -82,19 +80,18 @@ remote:
   # default configuration for fetching latest repository
   fetch: no
   # always fetch each repositories (it cannot be overridden)
-  fetch_always: no
+  fetch_always: yes
   # location aliases for remote repositories
   aliases:
     bos: '{meta_repo}'
     openwrt_feed: git://git.openwrt.org/feed
   # default location for remote repositories
   location: bos
-  # default branch for repositories
-  branch: '{meta_branch}'
   # list of remote repositories
   repos:
     lede:
       project: lede.git
+      branch: 9340bcdfc7d2ed4ebac2d74112dd33fc91ff9744
     lede-packages:
       location: openwrt_feed
       project: packages.git
@@ -109,15 +106,19 @@ remote:
       branch: ac6415e61f147a6892fd2785337aec93ddc68fa9
     luci:
       project: luci.git
+      branch: eb9d9170258e063aa41630f0bbf8bbae6bb8b6d7
     binary:
       config_name: BINARY
       project: braiins-bin.git
+      branch: d86b1f82ea2680cb5c78e161b8e9b576729f94f1
     u-boot:
       config_name: UBOOT
       project: u-boot-xlnx.git
+      branch: 9a9a66957e3ec1bad81d8bc9a6e0ea54ca371b30
     linux:
       config_name: KERNEL
       project: linux-xlnx.git
+      branch: 15b13cb5ef124be71051d677890449384c34a3b9
     # it is possible to continue with any user repositories
 
 monorepo:
