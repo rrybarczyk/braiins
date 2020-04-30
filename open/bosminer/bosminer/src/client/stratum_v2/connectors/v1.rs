@@ -70,7 +70,7 @@ impl Connector {
             TranslationHandler::new(v1_framed_connection, self.translation_options);
         tokio::spawn(async move {
             let status = translation_handler.run().await;
-            info!("V2->V1 translation terminated: {:?}", status);
+            debug!("V2->V1 translation terminated: {:?}", status);
         });
 
         Ok((
@@ -222,7 +222,7 @@ impl TranslationHandler {
     /// terminate upon any error or timeout
     async fn run(mut self) -> error::Result<()> {
         //while !self.status.is_shutting_down() {
-        info!("Starting V2->V1 translation handler");
+        trace!("Starting V2->V1 translation handler");
         loop {
             select! {
                 // Receive V1 frame and translate it to V2 message
