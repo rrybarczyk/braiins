@@ -755,7 +755,7 @@ impl StratumClient {
             }
             // pass any other extension down the line
             _ => {
-                info!(
+                debug!(
                     "Received protocol extension frame: {:x?} passing down",
                     frame
                 );
@@ -767,7 +767,7 @@ impl StratumClient {
                     .await
                     .try_send(ExtensionChannelMsg::Frame(frame))
                 {
-                    info!(
+                    debug!(
                         "Cannot pass extension frame, extension channel not available: {:?}",
                         e
                     );
@@ -882,8 +882,8 @@ impl StratumClient {
                         }
                     }
                     Ok(Err(e)) | Err(e) => {
-                        info!(
-                            "Failed to negotiation initial V2 target: at {}, user={} ({:?}",
+                        debug!(
+                            "Failed to negotiate initial V2 target: at {}, user={} ({:?})",
                             host_and_port, user, e
                         );
                         // TODO consolidate this, so that we have exactly 1 place where we
