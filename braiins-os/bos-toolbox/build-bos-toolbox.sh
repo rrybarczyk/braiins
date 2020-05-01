@@ -56,7 +56,7 @@ for i in upgrade firmware system; do
     DATA_ARGS="${DATA_ARGS} --add-data ./${EMBEDDED_BOS_RELEASE}/$i${PYINST_PATH_SEP}$i"
 done
 
-pyinstaller $ICON_ARG -F $DATA_ARGS bos-toolbox.py --name bos${BOS_VARIANT}-box
+pyinstaller $ICON_ARG -F $DATA_ARGS bos-toolbox.py --name bos${BOS_VARIANT}-toolbox
 
 # Cleanup the converted symlinks on Windows
 if [ x$MSYSTEM = xMINGW64 ]; then
