@@ -125,7 +125,7 @@ def main(args):
 
 
 def install(args, host, username, password, stage3_user_path, stage3_builtin_path):
-    print("Connecting to %s..." % host)
+    print("Installing %s to %s..." % (get_fw_image_name(), host))
     with SSHManager(host, username, password, load_host_keys=False) as ssh:
         # check compatibility of remote server
         check_compatibility(ssh)
@@ -227,16 +227,25 @@ def install(args, host, username, password, stage3_user_path, stage3_builtin_pat
     else:
         wait_for_port(host, 80, REBOOT_DELAY)
 
-def build_arg_parser(parser):
-
+def get_fw_image_name():
+    '''
+    :return: Installation image name (when running from the bundle)
+    '''
     if getattr(sys, 'frozen', False):
         bos_version_file = os.path.join(get_data_root_path(), 'bos-version.txt')
         f = open(bos_version_file, "r")
-        bos_image='{}'.format(f.read()).strip()
-        plus = '+' if 'plus' in bos_image else ''
-        description_suffix = '{} ({})'.format(plus, bos_image)
+        return '{}'.format(f.read()).strip()
     else:
-        description_suffix=''
+        return "'unknown version - local unpacked unzipped image'"
+
+def build_arg_parser(parser):
+    fw_image_name = get_fw_image_name()
+
+    if getattr(sys, 'frozen', False):
+        plus = '+' if 'plus' in fw_image_name else ''
+        description_suffix = '{} ({})'.format(plus, fw_image_name)
+    else:
+        description_suffix=' ({})'.format(fw_image_name)
 
     parser.description = 'Install Braiins OS{} onto a mining machine'.format(
         description_suffix)
