@@ -91,6 +91,10 @@ if __name__ == '__main__':
         func = args.func
     except AttributeError:
         parser.print_help(sys.stderr)
+        import platform
+
+        if platform.system() == 'Windows':
+            input('Press Enter to continue...')
         sys.exit(1)
 
     try:
