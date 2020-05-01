@@ -24,6 +24,8 @@
 
 import argparse
 import sys
+from datetime import datetime, timezone
+import git
 
 import upgrade2bos
 import restore2factory
@@ -46,9 +48,28 @@ def add_tool(subparsers, tool):
     module.build_arg_parser(parser)
 
 
+def get_version():
+    repo = git.Repo(search_parent_directories=True)
+    commit_timestamp = repo.head.object.committed_date
+    commit_time = datetime.fromtimestamp(commit_timestamp, timezone.utc)
+
+    version = '{:%Y-%m-%d}-'.format(commit_time)
+    commit = repo.head.object.hexsha[:8]
+    dirty = '-dirty' if repo.is_dirty() else ''
+
+    return '{}{}{}'.format(version, commit, dirty)
+
+
 if __name__ == '__main__':
     # execute only if run as a script
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description='Provides tools for managing mining '
+        'devices running Braiins OS and '
+        'Braiins OS+'
+    )
+    parser.add_argument(
+        '--version', action='version', version='%(prog)s {}'.format(get_version())
+    )
     subparsers = parser.add_subparsers(
         title='subcommands',
         description='Braiins OS tools in the ' 'toolbox',
@@ -72,7 +93,7 @@ if __name__ == '__main__':
     try:
         func = args.func
     except AttributeError:
-        parser.error('too few arguments')
+        parser.print_help(sys.stderr)
         sys.exit(1)
 
     try:

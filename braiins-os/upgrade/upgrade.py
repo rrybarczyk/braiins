@@ -227,8 +227,19 @@ def install(args, host, username, password, stage3_user_path, stage3_builtin_pat
     else:
         wait_for_port(host, 80, REBOOT_DELAY)
 
-
 def build_arg_parser(parser):
+
+    if getattr(sys, 'frozen', False):
+        bos_version_file = os.path.join(get_data_root_path(), 'bos-version.txt')
+        f = open(bos_version_file, "r")
+        bos_image='{}'.format(f.read()).strip()
+        plus = '+' if 'plus' in bos_image else ''
+        description_suffix = '{} ({})'.format(plus, bos_image)
+    else:
+        description_suffix=''
+
+    parser.description = 'Install Braiins OS{} onto a mining machine'.format(
+        description_suffix)
     parser_sources = parser.add_mutually_exclusive_group(required=True)
     parser_sources.add_argument('hostname', nargs='?',
                         help='hostname of miner with original firmware')

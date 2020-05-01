@@ -451,6 +451,8 @@ def call_command(command, command_method, args):
     command_method()
 
 def build_arg_parser(parser):
+    parser.description = 'Provides discover of mining machines (including machines ' \
+                         'running factory firmware).'
     command = CommandManager()
 
     subparsers = parser.add_subparsers()

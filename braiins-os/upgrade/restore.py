@@ -114,6 +114,7 @@ def main(args):
 
 
 def build_arg_parser(parser):
+    parser.description = 'Uninstall Braiins OS or Braiins OS+ from the mining machine.'
     parser.add_argument('backup', nargs='?',
                         help='path to directory or tgz file with data for miner restore')
     parser.add_argument('hostname',

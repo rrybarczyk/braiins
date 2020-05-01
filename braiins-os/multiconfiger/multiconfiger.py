@@ -15,8 +15,6 @@ try:
 except:
     sys.exit('missing requests library')
 
-version = '0.1.DEVEL'
-
 # these are in roughly same order as in web UI
 fields = [
     # pool group
@@ -620,6 +618,7 @@ log_error.count = 0
 
 
 def build_arg_parser(parser):
+    parser.description = 'Configure mining machines running Braiins OS or Braiins OS+'
     parser.add_argument(
         'action',
         type=lambda x: x.strip().lower(),
@@ -638,9 +637,7 @@ def build_arg_parser(parser):
 
 if __name__ == '__main__':
     try:
-        parser = argparse.ArgumentParser(
-            description='multiconfiger version %s' % version
-        )
+        parser = argparse.ArgumentParser()
         build_arg_parser(parser)
         args = parser.parse_args()
         main(args)
