@@ -24,6 +24,13 @@ else
     VIRTUAL_ENV_BIN=bin
 fi
 
+TOOLBOX_DIRTY=`git diff --quiet || echo '-dirty'`
+TOOLBOX_VERSION=`git show --no-patch --no-notes --date='format:%Y-%m-%d' \
+--pretty='%cd-%h' HEAD`
+
+# Generate version string of the binary as an optional module
+echo "toolbox = '${TOOLBOX_VERSION}${TOOLBOX_DIRTY}'" > version.py
+
 virtualenv ${VIRTUAL_ENV_ARGS} .bos-toolbox-env
 source .bos-toolbox-env/${VIRTUAL_ENV_BIN}/activate
 

@@ -4,3 +4,4 @@ dist/
 build/
 braiins-os*
 Antminer*
+version.py

@@ -24,8 +24,6 @@
 
 import argparse
 import sys
-from datetime import datetime, timezone
-import git
 
 import upgrade2bos
 import restore2factory
@@ -49,15 +47,12 @@ def add_tool(subparsers, tool):
 
 
 def get_version():
-    repo = git.Repo(search_parent_directories=True)
-    commit_timestamp = repo.head.object.committed_date
-    commit_time = datetime.fromtimestamp(commit_timestamp, timezone.utc)
+    try:
+        import version
 
-    version = '{:%Y-%m-%d}-'.format(commit_time)
-    commit = repo.head.object.hexsha[:8]
-    dirty = '-dirty' if repo.is_dirty() else ''
-
-    return '{}{}{}'.format(version, commit, dirty)
+        return version.toolbox
+    except ModuleNotFoundError:
+        return 'devel'
 
 
 if __name__ == '__main__':
