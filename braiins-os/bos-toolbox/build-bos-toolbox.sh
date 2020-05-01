@@ -13,15 +13,25 @@ EMBEDDED_BOS_RELEASE=$(basename ${1%.tar.gz})
 echo $EMBEDDED_BOS_RELEASE > bos-version.txt
 tar xvzf $1
 
+# Optional suffix of the output binary contains 'plus' when bundling with
+# Braiins OS+ firmware
+if echo ${EMBEDDED_BOS_RELEASE} | grep --quiet plus; then
+  BOS_VARIANT='-plus'
+else
+  BOS_VARIANT=''
+fi
+
 if [ x$MSYSTEM = xMINGW64 ]; then
     PYINST_PATH_SEP=';'
     VIRTUAL_ENV_ARGS=
     VIRTUAL_ENV_BIN=Scripts
+    ICON_ARG="--icon bos${BOS_VARIANT}.ico"
     git rm-symlinks
 else
     PYINST_PATH_SEP=':'
     VIRTUAL_ENV_ARGS=--python=/usr/bin/python3
     VIRTUAL_ENV_BIN=bin
+    ICON_ARG=''
 fi
 
 TOOLBOX_DIRTY=`git diff --quiet || echo '-dirty'`
@@ -46,16 +56,7 @@ for i in upgrade firmware system; do
     DATA_ARGS="${DATA_ARGS} --add-data ./${EMBEDDED_BOS_RELEASE}/$i${PYINST_PATH_SEP}$i"
 done
 
-# Optional suffix of the output binary contains 'plus' when bundling with
-# Braiins OS+ firmware
-if echo ${EMBEDDED_BOS_RELEASE} | grep --quiet plus; then
-  BOS_VARIANT='-plus'
-else
-  BOS_VARIANT=''
-fi
-
-pyinstaller -F $DATA_ARGS bos-toolbox.py --name bos${BOS_VARIANT}-box
-
+pyinstaller $ICON_ARG -F $DATA_ARGS bos-toolbox.py --name bos${BOS_VARIANT}-box
 
 # Cleanup the converted symlinks on Windows
 if [ x$MSYSTEM = xMINGW64 ]; then
