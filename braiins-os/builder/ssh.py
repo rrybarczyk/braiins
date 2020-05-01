@@ -80,8 +80,11 @@ class SSHManager:
         if load_host_keys:
             logging.debug("Loading system host keys...'")
             self._client.load_system_host_keys()
+            policy = paramiko.WarningPolicy()
+        else:
+            policy = paramiko.AutoAddPolicy()
 
-        self._client.set_missing_host_key_policy(paramiko.WarningPolicy())
+        self._client.set_missing_host_key_policy(policy)
 
     def _connect(self):
         """

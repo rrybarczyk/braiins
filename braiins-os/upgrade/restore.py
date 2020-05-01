@@ -81,7 +81,7 @@ def restore_firmware(args, ssh, backup_dir=None):
 
 def main(args):
     print('Connecting to remote host...')
-    with SSHManager(args.hostname, USERNAME, PASSWORD) as ssh:
+    with SSHManager(args.hostname, USERNAME, PASSWORD, load_host_keys=False) as ssh:
         args.mode = detect_bos_mode(ssh)
 
         backup_path = args.backup

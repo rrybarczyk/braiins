@@ -126,7 +126,7 @@ def main(args):
 
 def install(args, host, username, password, stage3_user_path, stage3_builtin_path):
     print("Connecting to %s..." % host)
-    with SSHManager(host, username, password) as ssh:
+    with SSHManager(host, username, password, load_host_keys=False) as ssh:
         # check compatibility of remote server
         check_compatibility(ssh)
 
