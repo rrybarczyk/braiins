@@ -54,7 +54,7 @@ else
   BOS_VARIANT=''
 fi
 
-pyinstaller -F $DATA_ARGS bos-toolbox.py --name bos${BOS_VARIANT}-toolbox
+pyinstaller -F $DATA_ARGS bos-toolbox.py --name bos${BOS_VARIANT}-box
 
 
 # Cleanup the converted symlinks on Windows
