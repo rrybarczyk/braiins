@@ -37,12 +37,13 @@ from upgrade.ssh import SSHError
 def add_tool(subparsers, tool):
     """
     Register a new tool into the toolbox
-    :param tool:
+    :param tool: tuple containing tool name used as subcommand and the actual tool module
     :return:
     """
-    tool_parser = subparsers.add_parser(tool.__name__)
-    tool_parser.set_defaults(func=tool.main)
-    tool.build_arg_parser(tool_parser)
+    (name, module) = tool
+    parser = subparsers.add_parser(name)
+    parser.set_defaults(func=module.main)
+    module.build_arg_parser(parser)
 
 
 if __name__ == '__main__':
@@ -56,7 +57,12 @@ if __name__ == '__main__':
         'how to use it',
     )
 
-    for t in [upgrade2bos, discover, restore2factory, multiconfiger]:
+    for t in [
+        ('install', upgrade2bos),
+        ('uninstall', restore2factory),
+        ('discover', discover),
+        ('config', multiconfiger),
+    ]:
         add_tool(subparsers, t)
 
     # parse command line arguments
