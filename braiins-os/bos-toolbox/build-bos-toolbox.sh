@@ -46,7 +46,16 @@ for i in upgrade firmware system; do
     DATA_ARGS="${DATA_ARGS} --add-data ./${EMBEDDED_BOS_RELEASE}/$i${PYINST_PATH_SEP}$i"
 done
 
-pyinstaller -F $DATA_ARGS bos-toolbox.py
+# Optional suffix of the output binary contains 'plus' when bundling with
+# Braiins OS+ firmware
+if echo ${EMBEDDED_BOS_RELEASE} | grep --quiet plus; then
+  BOS_VARIANT='-plus'
+else
+  BOS_VARIANT=''
+fi
+
+pyinstaller -F $DATA_ARGS bos-toolbox.py --name bos${BOS_VARIANT}-toolbox
+
 
 # Cleanup the converted symlinks on Windows
 if [ x$MSYSTEM = xMINGW64 ]; then
