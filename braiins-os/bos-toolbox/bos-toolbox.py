@@ -29,6 +29,7 @@ import upgrade2bos
 import restore2factory
 import discover
 import multiconfiger
+import update
 
 from upgrade.platform import PlatformStop
 from upgrade.ssh import SSHError
@@ -78,6 +79,7 @@ if __name__ == '__main__':
         ('uninstall', restore2factory),
         ('discover', discover),
         ('config', multiconfiger),
+        ('update', update),
     ]:
         add_tool(subparsers, t)
 
