@@ -98,11 +98,8 @@ impl From<Measurement> for Option<f32> {
 impl fmt::Display for Measurement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Measurement::NotPresent => write!(f, "-"),
-            Measurement::InvalidReading | Measurement::OpenCircuit | Measurement::ShortCircuit => {
-                write!(f, "Err")
-            }
             Measurement::Ok(t) => write!(f, "{:.0}°C", t),
+            _ => fmt::Debug::fmt(self, f),
         }
     }
 }
