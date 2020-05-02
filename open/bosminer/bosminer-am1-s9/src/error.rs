@@ -26,7 +26,7 @@ use failure::{Backtrace, Context, Fail};
 use std::fmt::{self, Debug, Display};
 
 use ii_async_i2c as i2c;
-use ii_sensors as sensor;
+use ii_sensors;
 use std::io;
 use sysfs_gpio;
 
@@ -192,8 +192,8 @@ impl From<i2c::Error> for Error {
     }
 }
 
-impl From<sensor::Error> for Error {
-    fn from(e: sensor::Error) -> Self {
+impl From<ii_sensors::Error> for Error {
+    fn from(e: ii_sensors::Error) -> Self {
         ErrorKind::Sensors(format!("{:?}", e)).into()
     }
 }

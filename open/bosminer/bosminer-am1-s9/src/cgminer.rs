@@ -28,7 +28,6 @@ use serde::Serialize;
 use std::sync::Arc;
 
 use crate::monitor;
-use crate::sensor;
 
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 #[repr(u32)]
@@ -167,13 +166,13 @@ impl Handler {
         for manager in self.managers.iter() {
             let inner = manager.inner.lock().await;
             if let Some(hash_chain) = inner.hash_chain.as_ref() {
-                let sensor::Temperature { local, remote } = hash_chain.current_temperature();
+                let temp = hash_chain.current_temperature();
                 list.push(response::ext::Temp {
                     idx: list.len() as i32,
                     id: manager.hashboard_idx as i32,
                     info: TempInfo {
-                        board: Option::from(local).unwrap_or(0.0) as f64,
-                        chip: Option::from(remote).unwrap_or(0.0) as f64,
+                        board: temp.local().unwrap_or(0.0) as f64,
+                        chip: temp.remote().unwrap_or(0.0) as f64,
                     },
                 });
             }

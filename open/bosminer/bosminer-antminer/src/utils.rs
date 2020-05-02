@@ -90,6 +90,19 @@ pub fn distance(x: usize, y: usize) -> usize {
     }
 }
 
+pub fn aggregate<T: Copy, F>(f: F, a: Option<T>, b: Option<T>) -> Option<T>
+where
+    F: FnOnce(T, T) -> T,
+{
+    match a {
+        None => b,
+        Some(x) => match b {
+            Some(y) => Some(f(x, y)),
+            None => Some(x),
+        },
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

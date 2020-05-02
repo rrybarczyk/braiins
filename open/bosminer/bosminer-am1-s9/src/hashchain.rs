@@ -29,8 +29,6 @@ pub use frequency::FrequencySettings;
 
 use ii_logging::macros::*;
 
-use ii_sensors::{self as sensor, Measurement};
-
 use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
@@ -55,6 +53,8 @@ use crate::monitor;
 use crate::null_work;
 use crate::power;
 use crate::registry;
+use crate::sensor::{Sensor, SensorResult};
+use crate::temperature;
 use crate::utils;
 
 use once_cell::sync::OnceCell;
@@ -94,15 +94,6 @@ const HALT_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Pre-computed PLL for quick lookup
 pub static PRECOMPUTED_PLL: OnceCell<bm1387::PllTable> = OnceCell::new();
-
-/// Number of attempts to try read temperature again if it doesn't look right
-const MAX_TEMP_REREAD_ATTEMPTS: usize = 3;
-
-/// Temperature difference that is considerd to be a "sudden temperature change"
-const MAX_SUDDEN_TEMPERATURE_JUMP: f32 = 12.0;
-
-/// Maximum number of errors before temperature sensor is disabled
-const MAX_SENSOR_ERRORS: usize = 10;
 
 /// Type representing plug pin
 #[derive(Clone)]
@@ -202,40 +193,6 @@ impl hal::BackendSolution for Solution {
     }
 }
 
-/// Helper structure for sending temperatures to Monitor
-#[derive(Debug)]
-struct S9Temp(sensor::Temperature);
-
-impl fmt::Display for S9Temp {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{},{}",
-            self.0.local.to_string(),
-            self.0.remote.to_string()
-        )
-    }
-}
-
-impl monitor::SummaryTemperature for S9Temp {
-    fn summary_temperature(&self) -> monitor::Temperature {
-        match self.0.remote {
-            // remote is chip temperature
-            Measurement::Ok(t_remote) => match self.0.local {
-                Measurement::Ok(t_local) => monitor::Temperature::Ok(t_remote.max(t_local)),
-                _ => monitor::Temperature::Ok(t_remote),
-            },
-            _ => {
-                // fake chip temperature from local (PCB) temperature
-                match self.0.local {
-                    Measurement::Ok(t_local) => monitor::Temperature::Ok(t_local + 15.0),
-                    _ => monitor::Temperature::Unknown,
-                }
-            }
-        }
-    }
-}
-
 /// Helper method to calculate time to finish one piece of work
 ///
 /// * `n_midstates` - number of midstates
@@ -301,8 +258,8 @@ pub struct HashChain {
     /// want to do this).
     pub(crate) disable_init_work: bool,
     /// channels through which temperature status is sent
-    temperature_sender: Mutex<Option<watch::Sender<sensor::Temperature>>>,
-    temperature_receiver: watch::Receiver<sensor::Temperature>,
+    temperature_sender: Mutex<Option<watch::Sender<temperature::Hashboard>>>,
+    temperature_receiver: watch::Receiver<temperature::Hashboard>,
     /// nonce counter
     pub counter: Arc<Mutex<counters::HashChain>>,
     /// halter to stop this hashchain
@@ -348,7 +305,7 @@ impl HashChain {
 
         // create temperature sending channel
         let (temperature_sender, temperature_receiver) =
-            watch::channel(sensor::INVALID_TEMPERATURE_READING);
+            watch::channel(temperature::Hashboard(SensorResult::NotInitialized));
 
         // create halt notification channel
         let (halt_sender, halt_receiver) = halt::make_pair(HALT_TIMEOUT);
@@ -379,7 +336,7 @@ impl HashChain {
         })
     }
 
-    pub fn current_temperature(&self) -> sensor::Temperature {
+    pub fn current_temperature(&self) -> temperature::Hashboard {
         self.temperature_receiver.borrow().clone()
     }
 
@@ -853,14 +810,14 @@ impl HashChain {
 
     async fn try_to_initialize_sensor(
         command_context: command::Context,
-    ) -> error::Result<Box<dyn sensor::Sensor>> {
+    ) -> error::Result<Box<dyn ii_sensors::Sensor>> {
         // construct I2C bus via command interface
         let i2c_bus = bm1387::i2c::Bus::new_and_init(command_context, TEMP_CHIP)
             .await
             .with_context(|_| ErrorKind::Sensors("bus construction failed".into()))?;
 
         // try to probe sensor
-        let sensor = sensor::probe_i2c_sensors(i2c_bus)
+        let sensor = ii_sensors::probe_i2c_sensors(i2c_bus)
             .await
             .map_err(|e| error::Error::from(e))
             .with_context(|_| ErrorKind::Sensors("error when probing sensors".into()))?;
@@ -887,24 +844,12 @@ impl HashChain {
         loop {
             // Send heartbeat to monitor with "unknown" temperature
             self.monitor_tx
-                .unbounded_send(monitor::Message::Running(Arc::new(S9Temp(
-                    sensor::INVALID_TEMPERATURE_READING,
+                .unbounded_send(monitor::Message::Running(Arc::new(temperature::Hashboard(
+                    SensorResult::NotPresent,
                 ))))
                 .expect("send failed");
 
             delay_for(bosminer_antminer::monitor::TEMP_UPDATE_INTERVAL).await;
-        }
-    }
-
-    fn max_temp(t: sensor::Temperature) -> Option<f32> {
-        let local: Option<f32> = t.local.into();
-        let remote: Option<f32> = t.remote.into();
-        match local {
-            Some(t1) => match remote {
-                Some(t2) => Some(t1.max(t2)),
-                None => local,
-            },
-            None => remote,
         }
     }
 
@@ -934,7 +879,7 @@ impl HashChain {
 
         // Try to probe sensor
         // This may fail - in which case we put `None` into `sensor`
-        let mut sensor = match Self::try_to_initialize_sensor(self.command_context.clone())
+        let hw = match Self::try_to_initialize_sensor(self.command_context.clone())
             .await
             .with_context(|_| ErrorKind::Hashboard(self.hashboard_idx, "sensor error".into()))
             .map_err(|e| e.into())
@@ -949,94 +894,24 @@ impl HashChain {
             error::Result::Ok(sensor) => sensor,
         };
 
-        // Compare temperature to previous to check if sudden temperature change occured
-        let mut last_max_temp: Option<f32> = None;
-        let mut try_again = MAX_TEMP_REREAD_ATTEMPTS;
-        let mut error_counter = 0.0;
+        // Construct sensor
+        let mut sensor = Sensor::new(format!("hb{}", self.hashboard_idx), hw);
 
         // "Watchdog" loop that pings monitor every some seconds
         loop {
             // Read temperature sensor
-            let temp = match sensor
-                .read_temperature()
-                .await
-                .map_err(|e| error::Error::from(e))
-                .with_context(|_| {
-                    ErrorKind::Hashboard(self.hashboard_idx, "temperature read fail".into())
-                })
-                .map_err(|e| e.into())
-            {
-                error::Result::Ok(temp) => {
-                    info!(
-                        "Hashchain {}: Measured temperature: {:?}, errors average: {:.1}",
-                        self.hashboard_idx, temp, error_counter
-                    );
-                    temp
-                }
-                error::Result::Err(e) => {
-                    error!(
-                        "Hashchain {}: Sensor temperature read failed: {}",
-                        self.hashboard_idx, e
-                    );
-                    sensor::INVALID_TEMPERATURE_READING
-                }
-            };
-            match temp.remote {
-                Measurement::OpenCircuit
-                | Measurement::ShortCircuit
-                | Measurement::InvalidReading => error_counter += 1.0,
-                _ => {}
-            }
-
-            let max_temp = Self::max_temp(temp.clone());
-            // Check for weird temperatures
-            if try_again > 0 {
-                // Both previous and current temperature must exist
-                if let Some(max_t) = max_temp {
-                    if let Some(old_max_t) = last_max_temp {
-                        if (max_t - old_max_t).abs() >= MAX_SUDDEN_TEMPERATURE_JUMP {
-                            warn!(
-                                "Hashchain {}: Temperature suddenly jumped from {} to {}, reading again",
-                                self.hashboard_idx, old_max_t, max_t
-                            );
-                            error_counter += 1.0;
-
-                            // Do not send anything out yet, just wait a bit and then try to read
-                            // the temperature again
-                            delay_for(Duration::from_millis(200)).await;
-                            try_again -= 1;
-                            continue;
-                        }
-                    }
-                }
-            }
-
-            // If there's too many errors, just disable this sensor
-            if error_counter >= MAX_SENSOR_ERRORS as f64 {
-                error!(
-                    "Hashchain {}: Too many sensor errors, disabling sensor",
-                    self.hashboard_idx
-                );
-                return self.no_sensor_task().await;
-            }
-            // Decay 30% of errors an hour: update it every TEMP_UPDATE_INTERVAL seconds, so one hour is
-            // `error_counter * 0.9995^(3600/5) = error_counter * 0.70`
-            error_counter *= 0.9995;
-
-            // Update last temp and reset tries
-            if max_temp.is_some() {
-                last_max_temp = max_temp;
-            }
-            try_again = MAX_TEMP_REREAD_ATTEMPTS;
+            let sensor_result = sensor.read().await;
 
             // Broadcast
             temperature_sender
-                .broadcast(temp.clone())
+                .broadcast(temperature::Hashboard(sensor_result.clone()))
                 .expect("temp broadcast failed");
 
             // Send heartbeat to monitor
             self.monitor_tx
-                .unbounded_send(monitor::Message::Running(Arc::new(S9Temp(temp))))
+                .unbounded_send(monitor::Message::Running(Arc::new(temperature::Hashboard(
+                    sensor_result,
+                ))))
                 .expect("send failed");
 
             delay_for(bosminer_antminer::monitor::TEMP_UPDATE_INTERVAL).await;
@@ -1151,8 +1026,6 @@ impl fmt::Display for HashChain {
 #[cfg(test)]
 mod test {
     use super::*;
-    use approx::assert_relative_eq;
-    use monitor::SummaryTemperature;
 
     /// Test work_time computation
     #[test]
@@ -1161,35 +1034,6 @@ mod test {
         assert_eq!(
             io::secs_to_fpga_ticks(calculate_work_delay_for_pll(1, 650_000_000)),
             36296
-        );
-    }
-
-    /// Test that faking S9 chip temperature from board temperature works
-    #[test]
-    fn test_summary_temperature() {
-        let temp = sensor::Temperature {
-            local: sensor::Measurement::Ok(10.0),
-            remote: sensor::Measurement::Ok(22.0),
-        };
-        match S9Temp(temp).summary_temperature() {
-            monitor::Temperature::Ok(t) => assert_relative_eq!(t, 22.0),
-            _ => panic!("missing temperature"),
-        };
-        let temp = sensor::Temperature {
-            local: sensor::Measurement::Ok(10.0),
-            remote: sensor::Measurement::OpenCircuit,
-        };
-        match S9Temp(temp).summary_temperature() {
-            monitor::Temperature::Ok(t) => assert_relative_eq!(t, 25.0),
-            _ => panic!("missing temperature"),
-        };
-        let temp = sensor::Temperature {
-            local: sensor::Measurement::InvalidReading,
-            remote: sensor::Measurement::OpenCircuit,
-        };
-        assert_eq!(
-            S9Temp(temp).summary_temperature(),
-            monitor::Temperature::Unknown
         );
     }
 }

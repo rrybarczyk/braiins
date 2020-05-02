@@ -28,13 +28,13 @@ pub mod gpio;
 pub mod hashchain;
 pub mod hooks;
 pub mod power;
+pub mod sensor;
+pub mod temperature;
 
 #[cfg(test)]
 pub mod test;
 
 use ii_logging::macros::*;
-
-use ii_sensors as sensor;
 
 use bosminer::async_trait;
 use bosminer::hal::{self, BackendConfig as _};
@@ -286,7 +286,7 @@ impl RunningChain {
             .await
     }
 
-    pub async fn current_temperature(&self) -> sensor::Temperature {
+    pub async fn current_temperature(&self) -> temperature::Hashboard {
         self.manager
             .inner
             .lock()
@@ -299,6 +299,11 @@ impl RunningChain {
 
     /// Check from `Monitor` status message if miner is hot enough
     /// Also: this will break if there are no temperature sensors
+    ///
+    /// TODO: Implement a method on `temperature::Hashboard` that will return if the temp. sensor
+    ///   can ever reach preheat temperature (ie. to prevent waiting on broken sensor). Every
+    ///   time a temperature is read from `Monitor`, check `temperature::Hashboard` if it
+    ///   `can_ever_preheat()'.
     fn preheat_ok(status: monitor::Status) -> bool {
         const PREHEAT_TEMP_EPSILON: f32 = 2.0;
         let target_temp;
