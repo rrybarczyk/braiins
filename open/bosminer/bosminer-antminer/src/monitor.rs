@@ -28,8 +28,6 @@ use ii_logging::macros::*;
 use crate::fan;
 use crate::halt;
 
-use ii_sensors::{self as sensor, Measurement};
-
 use std::fmt;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -52,6 +50,43 @@ const TICK_LENGTH: Duration = Duration::from_secs(5);
 /// How long does it take until miner warm up? We won't let it tu turn fans off until then...
 const WARM_UP_PERIOD: Duration = Duration::from_secs(90);
 
+/// Interpreted hashchain temperature
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Temperature {
+    /// Temperature unknown
+    Unknown,
+    /// Temperature OK
+    Ok(f32),
+}
+
+impl Temperature {
+    /// Get maximum of two temperatures
+    fn max(&self, other: &Temperature) -> Temperature {
+        match self {
+            Temperature::Unknown => *other,
+            Temperature::Ok(t1) => match other {
+                Temperature::Unknown => *self,
+                Temperature::Ok(t2) => Temperature::Ok(t1.max(*t2)),
+            },
+        }
+    }
+}
+
+impl fmt::Display for Temperature {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Temperature::Unknown => write!(f, "Unknown"),
+            Temperature::Ok(t) => write!(f, "{:.0}°C", t),
+        }
+    }
+}
+
+/// Trait that lets us get *one* summary temperature from various objects
+pub trait SummaryTemperature: Send + Sync + fmt::Display + fmt::Debug {
+    /// Extract temperature from object
+    fn summary_temperature(&self) -> Temperature;
+}
+
 /// A message from hashchain
 ///
 /// Here are some rules that HashChains registered with monitors have to obey:
@@ -60,70 +95,24 @@ const WARM_UP_PERIOD: Duration = Duration::from_secs(90);
 /// - duration between `On` and first `Running` must be less than START_TIMEOUT
 /// - duration between `Running` measurement and the next one must be less than
 ///   RUN_UPDATE_INTERVAL (ideally set periodic update to half of this interval)
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum Message {
     On,
-    Running(sensor::Temperature),
+    Running(Arc<dyn SummaryTemperature>),
     Off,
-}
-
-/// Interpreted hashchain temperature
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum ChainTemperature {
-    /// Temperature unknown... in a good way (hashchain initializing, etc.)
-    Unknown,
-    /// Temperature unknown... in a bad way (miner caught fire, etc.)
-    Failed,
-    /// Temperature was measured
-    Ok(f32),
-}
-
-impl ChainTemperature {
-    /// Convert temperature to monitor interpretation.
-    /// Specific to S9, because it fakes chip temperature.
-    ///
-    /// TODO: Maybe figure out a strage for disabling remote sensors that are failing. Sometimes
-    /// remote sensors fail while mining and instead of signalizing error they return non-sensical
-    /// numbers.
-    /// TODO: Is returning "Unknown" when sensor fails OK?
-    fn from_s9_sensor(temp: sensor::Temperature) -> Self {
-        match temp.remote {
-            // remote is chip temperature
-            Measurement::Ok(t_remote) => match temp.local {
-                Measurement::Ok(t_local) => Self::Ok(t_remote.max(t_local)),
-                _ => Self::Ok(t_remote),
-            },
-            _ => {
-                // fake chip temperature from local (PCB) temperature
-                match temp.local {
-                    Measurement::Ok(t_local) => Self::Ok(t_local + 15.0),
-                    _ => Self::Unknown,
-                }
-            }
-        }
-    }
-}
-
-impl fmt::Display for ChainTemperature {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ChainTemperature::Unknown => write!(f, "???"),
-            ChainTemperature::Failed => write!(f, "Fail"),
-            ChainTemperature::Ok(t) => write!(f, "{:.0}°C", t),
-        }
-    }
 }
 
 /// State of hashchain as seen from Monitor point of view
 /// The `Instant` timestamps are when that event happen (only states that operate with
 /// timeouts use it).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 enum ChainState {
     On(Instant),
     Running {
         started: Instant,
         last_heartbeat: Instant,
-        temperature: sensor::Temperature,
+        /// Temperature object, not temporary object
+        temp_obj: Arc<dyn SummaryTemperature>,
     },
     Off,
     Broken(&'static str),
@@ -146,12 +135,12 @@ impl ChainState {
                 ChainState::Off => *self = ChainState::On(now),
                 _ => self.bad_transition(),
             },
-            Message::Running(temperature) => match *self {
+            Message::Running(temp_obj) => match *self {
                 ChainState::Running { started, .. } | ChainState::On(started) => {
                     *self = ChainState::Running {
                         started,
                         last_heartbeat: now,
-                        temperature,
+                        temp_obj,
                     }
                 }
                 _ => self.bad_transition(),
@@ -185,14 +174,10 @@ impl ChainState {
     /// Return hashchain temperature as seen from our point of view. For example,
     /// `Broken` miner doesn't have a valid temperature reading even though it sent
     /// some numbers a while ago.
-    fn get_temperature(&self) -> ChainTemperature {
+    fn get_temperature(&self) -> Temperature {
         match self {
-            ChainState::On(_) => ChainTemperature::Unknown,
-            ChainState::Off => ChainTemperature::Unknown,
-            ChainState::Broken(_) => ChainTemperature::Failed,
-            ChainState::Running { temperature, .. } => {
-                ChainTemperature::from_s9_sensor(temperature.clone())
-            }
+            ChainState::Running { ref temp_obj, .. } => temp_obj.summary_temperature(),
+            _ => Temperature::Unknown,
         }
     }
 
@@ -212,12 +197,7 @@ impl fmt::Display for ChainState {
         match self {
             ChainState::On { .. } => write!(f, "Starting"),
             ChainState::Off => write!(f, "Off"),
-            ChainState::Running { temperature, .. } => write!(
-                f,
-                "{},{}",
-                temperature.local.to_string(),
-                temperature.remote.to_string()
-            ),
+            ChainState::Running { ref temp_obj, .. } => write!(f, "On({})", temp_obj,),
             ChainState::Broken { .. } => write!(f, "Broken"),
         }
     }
@@ -296,9 +276,9 @@ impl ControlDecision {
     fn decide_fan_control(
         fan_config: &FanControlConfig,
         temp_config: &TempControlConfig,
-        temp: ChainTemperature,
+        temp: Temperature,
     ) -> ControlDecisionExplained {
-        if temp == ChainTemperature::Unknown {
+        if temp == Temperature::Unknown {
             return ControlDecisionExplained {
                 decision: Self::UseFixedSpeed(fan::Speed::FULL_SPEED),
                 reason: "Fans full speed: unknown temperature".into(),
@@ -312,10 +292,10 @@ impl ControlDecision {
                 };
             }
             FanControlMode::TargetTemperature(target_temp) => match temp {
-                ChainTemperature::Failed | ChainTemperature::Unknown => {
+                Temperature::Unknown => {
                     panic!("BUG: should've been caught earlier at the top of `decide()` function")
                 }
-                ChainTemperature::Ok(input_temp) => {
+                Temperature::Ok(input_temp) => {
                     if input_temp >= temp_config.hot_temp {
                         return ControlDecisionExplained {
                             decision: Self::UseFixedSpeed(fan::Speed::FULL_SPEED),
@@ -362,19 +342,13 @@ impl ControlDecision {
     fn decide(
         config: &Config,
         num_fans_running: usize,
-        temp: ChainTemperature,
+        temp: Temperature,
     ) -> ControlDecisionExplained {
         // This section is labeled `TEMP_DANGER` in the diagram
         // Check for dangerous temperature or dead sensors
         if let Some(temp_config) = config.temp_config.as_ref() {
             match temp {
-                ChainTemperature::Failed => {
-                    return ControlDecisionExplained {
-                        decision: Self::Shutdown,
-                        reason: "Shutdown: temperature readout FAILED".into(),
-                    };
-                }
-                ChainTemperature::Ok(input_temp) => {
+                Temperature::Ok(input_temp) => {
                     if input_temp >= temp_config.dangerous_temp {
                         return ControlDecisionExplained {
                             decision: Self::Shutdown,
@@ -382,7 +356,7 @@ impl ControlDecision {
                         };
                     }
                 }
-                ChainTemperature::Unknown => {}
+                Temperature::Unknown => {}
             }
         }
         // Check the health of fans and decide their speed
@@ -422,57 +396,13 @@ impl ControlDecision {
     }
 }
 
-/// This structure abstracts the process of "making one aggregate temperature out of
-/// all hashchain temperatures".
-/// The resulting temperature is used as an input variable for PID control.
-#[derive(Debug, Clone)]
-pub struct TemperatureAccumulator {
-    pub chain_temperatures: Vec<ChainTemperature>,
-}
-
-impl TemperatureAccumulator {
-    fn new() -> Self {
-        Self {
-            chain_temperatures: vec![],
-        }
-    }
-
-    fn add_chain_temp(&mut self, chain_temp: ChainTemperature) {
-        self.chain_temperatures.push(chain_temp);
-    }
-
-    /// Function to calculate aggregated temperature.
-    /// This one calculates maximum temperatures over all temperatures measured while
-    /// prefering failures to measurement.
-    fn calc_result(&self) -> ChainTemperature {
-        let mut temps = vec![];
-        for &temp in self.chain_temperatures.iter() {
-            match temp {
-                // Failure thrumps everything
-                ChainTemperature::Failed => return temp,
-                // Unknown temperature doesn't add any information
-                ChainTemperature::Unknown => (),
-                // Collect measurements
-                ChainTemperature::Ok(t) => temps.push(t),
-            }
-        }
-        // If we collected any temperatures, take maximum of them, otherwise return unknown
-        if temps.len() > 0 {
-            ChainTemperature::Ok(temps.drain(..).fold(0.0, |a, b| a.max(b)))
-        } else {
-            ChainTemperature::Unknown
-        }
-    }
-}
-
 /// Status of `Monitor` for others to observe
 #[derive(Debug, Clone)]
 pub struct Status {
     pub config: Config,
     pub fan_feedback: fan::Feedback,
     pub fan_speed: Option<fan::Speed>,
-    pub input_temperature: ChainTemperature,
-    pub temperature_accumulator: TemperatureAccumulator,
+    pub input_temperature: Temperature,
     pub decision_explained: ControlDecisionExplained,
 }
 
@@ -582,7 +512,7 @@ impl Monitor {
     async fn do_tick(&self) {
         // decide hashchain state and collect temperatures
         let mut inner = self.inner.lock().await;
-        let mut temperature_accumulator = TemperatureAccumulator::new();
+        let mut temperature = Temperature::Unknown;
         let mut miner_warming_up = false;
         let mut chain_info_status = vec![];
         for chain in inner.chains.iter() {
@@ -600,10 +530,9 @@ impl Monitor {
             }
             trace!("Monitor: chain {}: {:?}", chain.hashboard_idx, chain.state);
             chain_info_status.push(chain.state.to_string());
-            temperature_accumulator.add_chain_temp(chain.state.get_temperature());
+            temperature = temperature.max(&chain.state.get_temperature());
             miner_warming_up |= chain.state.is_warming_up(Instant::now());
         }
-        let input_temperature = temperature_accumulator.calc_result();
 
         // Read fans
         let fan_feedback = inner.fan_control.read_feedback();
@@ -612,11 +541,11 @@ impl Monitor {
             "Monitor: fan={:?} num_fans={} acc.temp.={:?}",
             fan_feedback,
             num_fans_running,
-            input_temperature,
+            temperature,
         );
         // all right, temperature has been aggregated, decide what to do
         let decision_explained =
-            ControlDecision::decide(&inner.config, num_fans_running, input_temperature);
+            ControlDecision::decide(&inner.config, num_fans_running, temperature);
         trace!("Monitor: {:?}", decision_explained);
         let status_line = format!(
             "{} | {} | {}",
@@ -655,8 +584,7 @@ impl Monitor {
         let monitor_status = Status {
             fan_feedback,
             fan_speed: inner.current_fan_speed,
-            input_temperature,
-            temperature_accumulator,
+            input_temperature: temperature,
             decision_explained,
             config: inner.config.clone(),
         };
@@ -707,7 +635,12 @@ impl Monitor {
 #[cfg(test)]
 mod test {
     use super::*;
-    use approx::assert_relative_eq;
+
+    impl SummaryTemperature for Temperature {
+        fn summary_temperature(&self) -> Temperature {
+            self.clone()
+        }
+    }
 
     macro_rules! assert_variant {
         ($value:expr, $pattern:pat) => {{
@@ -725,35 +658,6 @@ mod test {
         }}; // TODO: Additional patterns for trailing args, like assert and assert_eq
     }
 
-    /// Test that faking S9 chip temperature from board temperature works
-    #[test]
-    fn test_monitor_s9_chip_temp() {
-        let temp = sensor::Temperature {
-            local: sensor::Measurement::Ok(10.0),
-            remote: sensor::Measurement::Ok(22.0),
-        };
-        match ChainTemperature::from_s9_sensor(temp) {
-            ChainTemperature::Ok(t) => assert_relative_eq!(t, 22.0),
-            _ => panic!("missing temperature"),
-        };
-        let temp = sensor::Temperature {
-            local: sensor::Measurement::Ok(10.0),
-            remote: sensor::Measurement::OpenCircuit,
-        };
-        match ChainTemperature::from_s9_sensor(temp) {
-            ChainTemperature::Ok(t) => assert_relative_eq!(t, 25.0),
-            _ => panic!("missing temperature"),
-        };
-        let temp = sensor::Temperature {
-            local: sensor::Measurement::InvalidReading,
-            remote: sensor::Measurement::OpenCircuit,
-        };
-        assert_eq!(
-            ChainTemperature::from_s9_sensor(temp),
-            ChainTemperature::Unknown
-        );
-    }
-
     fn send(mut state: ChainState, when: Instant, message: Message) -> ChainState {
         state.transition(when, message);
         state
@@ -762,22 +666,18 @@ mod test {
     /// Test that miner transitions states as expected
     #[test]
     fn test_monitor_state_transition() {
-        let temp = sensor::Temperature {
-            local: sensor::Measurement::Ok(10.0),
-            remote: sensor::Measurement::Ok(22.0),
-        };
+        let temp_obj = Arc::new(Temperature::Ok(22.0));
         let now = Instant::now();
         let later = now + Duration::from_secs(1);
         let running_state = ChainState::Running {
             started: now,
             last_heartbeat: now,
-            temperature: temp.clone(),
+            temp_obj: temp_obj.clone(),
         };
 
-        //assert_eq!(send(ChainState::Running(now, temp), later, Message::Off), ChainState::Off);
         assert_variant!(send(ChainState::Off, later, Message::On), ChainState::On(_));
         assert_variant!(
-            send(ChainState::Off, later, Message::Running(temp.clone())),
+            send(ChainState::Off, later, Message::Running(temp_obj.clone())),
             ChainState::Broken(_)
         );
         assert_variant!(
@@ -790,7 +690,7 @@ mod test {
             ChainState::Broken(_)
         );
         assert_variant!(
-            send(ChainState::On(now), later, Message::Running(temp.clone())),
+            send(ChainState::On(now), later, Message::Running(temp_obj.clone())),
             ChainState::Running{ .. }
         );
         assert_variant!(
@@ -806,7 +706,7 @@ mod test {
             send(
                 running_state.clone(),
                 later,
-                Message::Running(temp.clone())
+                Message::Running(temp_obj.clone())
             ),
             ChainState::Running { .. }
         );
@@ -819,17 +719,14 @@ mod test {
     /// Test "warm up" period
     #[test]
     fn test_monitor_warm_up() {
-        let temp = sensor::Temperature {
-            local: sensor::Measurement::Ok(10.0),
-            remote: sensor::Measurement::Ok(22.0),
-        };
+        let temp_obj = Arc::new(Temperature::Ok(22.0));
         let now = Instant::now();
         let later = now + Duration::from_secs(20);
         let warmed_time = now + Duration::from_secs(200);
         let running_state = ChainState::Running {
             started: now,
             last_heartbeat: now,
-            temperature: temp.clone(),
+            temp_obj: temp_obj.clone(),
         };
 
         assert_eq!(ChainState::Off.is_warming_up(now), false);
@@ -848,17 +745,14 @@ mod test {
     /// Test timeouts
     #[test]
     fn test_monitor_timeouts() {
-        let temp = sensor::Temperature {
-            local: sensor::Measurement::Ok(10.0),
-            remote: sensor::Measurement::Ok(22.0),
-        };
+        let temp_obj = Arc::new(Temperature::Ok(22.0));
         let now = Instant::now();
         let long = now + Duration::from_secs(10_000);
         let short = now + Duration::from_secs(2);
         let running_state = ChainState::Running {
             started: now,
             last_heartbeat: now,
-            temperature: temp.clone(),
+            temp_obj: temp_obj.clone(),
         };
 
         // test that chains break when no-one updates them for long (unless they are turned off)
@@ -876,73 +770,21 @@ mod test {
 
         // different states have different update timeouts
         assert_variant!(
-            tick(ChainState::On(now), now + Duration::from_secs(20)),
+            tick(ChainState::On(now), now + Duration::from_secs(40)),
             ChainState::On(_)
         );
         assert_variant!(
-            tick(running_state.clone(), now + Duration::from_secs(20)),
+            tick(running_state.clone(), now + Duration::from_secs(40)),
             ChainState::Broken(_)
-        );
-    }
-
-    fn test_acc(temp1: ChainTemperature, temp2: ChainTemperature) -> ChainTemperature {
-        let mut tacc = TemperatureAccumulator::new();
-        tacc.add_chain_temp(temp1);
-        tacc.add_chain_temp(temp2);
-        tacc.calc_result()
-    }
-
-    /// Test temperature accumulator
-    #[test]
-    fn test_monitor_temp_acc() {
-        assert_eq!(
-            test_acc(ChainTemperature::Unknown, ChainTemperature::Unknown),
-            ChainTemperature::Unknown
-        );
-        assert_eq!(
-            test_acc(ChainTemperature::Failed, ChainTemperature::Unknown),
-            ChainTemperature::Failed
-        );
-        assert_eq!(
-            test_acc(ChainTemperature::Ok(10.0), ChainTemperature::Unknown),
-            ChainTemperature::Ok(10.0)
-        );
-        assert_eq!(
-            test_acc(ChainTemperature::Unknown, ChainTemperature::Failed),
-            ChainTemperature::Failed
-        );
-        assert_eq!(
-            test_acc(ChainTemperature::Failed, ChainTemperature::Failed),
-            ChainTemperature::Failed
-        );
-        assert_eq!(
-            test_acc(ChainTemperature::Ok(10.0), ChainTemperature::Failed),
-            ChainTemperature::Failed
-        );
-        assert_eq!(
-            test_acc(ChainTemperature::Unknown, ChainTemperature::Ok(20.0)),
-            ChainTemperature::Ok(20.0)
-        );
-        assert_eq!(
-            test_acc(ChainTemperature::Failed, ChainTemperature::Ok(20.0)),
-            ChainTemperature::Failed
-        );
-        assert_eq!(
-            test_acc(ChainTemperature::Ok(10.0), ChainTemperature::Ok(20.0)),
-            ChainTemperature::Ok(20.0)
-        );
-        assert_eq!(
-            test_acc(ChainTemperature::Ok(10.0), ChainTemperature::Ok(5.0)),
-            ChainTemperature::Ok(10.0)
         );
     }
 
     /// Test temperature decision tree (non-exhaustive test)
     #[test]
     fn test_decide() {
-        let dang_temp = ChainTemperature::Ok(150.0);
-        let hot_temp = ChainTemperature::Ok(95.0);
-        let low_temp = ChainTemperature::Ok(50.0);
+        let dang_temp = Temperature::Ok(150.0);
+        let hot_temp = Temperature::Ok(95.0);
+        let low_temp = Temperature::Ok(50.0);
         let temp_config = TempControlConfig {
             dangerous_temp: 100.0,
             hot_temp: 80.0,
@@ -994,10 +836,6 @@ mod test {
             ControlDecision::decide(&all_off_config, 0, dang_temp.clone()).decision,
             ControlDecision::Nothing
         );
-        assert_variant!(
-            ControlDecision::decide(&all_off_config, 0, ChainTemperature::Failed).decision,
-            ControlDecision::Nothing
-        );
 
         assert_eq!(
             ControlDecision::decide(&fans_on_config, 2, dang_temp.clone()).decision,
@@ -1011,10 +849,6 @@ mod test {
             ControlDecision::decide(&fans_on_config, 1, dang_temp.clone()).decision,
             ControlDecision::Shutdown
         );
-        assert_eq!(
-            ControlDecision::decide(&fans_on_config, 2, ChainTemperature::Failed).decision,
-            ControlDecision::UseFixedSpeed(fan_speed)
-        );
 
         // fans set to 0 -> do not check if fans are running
         assert_eq!(
@@ -1022,12 +856,8 @@ mod test {
             ControlDecision::UseFixedSpeed(fans_off)
         );
 
-        assert_eq!(
-            ControlDecision::decide(&temp_on_config, 0, ChainTemperature::Failed).decision,
-            ControlDecision::Shutdown
-        );
         assert_variant!(
-            ControlDecision::decide(&temp_on_config, 0, ChainTemperature::Unknown).decision,
+            ControlDecision::decide(&temp_on_config, 0, Temperature::Unknown).decision,
             ControlDecision::Nothing
         );
         assert_eq!(
@@ -1048,11 +878,7 @@ mod test {
             ControlDecision::Shutdown
         );
         assert_eq!(
-            ControlDecision::decide(&both_on_config, 2, ChainTemperature::Failed).decision,
-            ControlDecision::Shutdown
-        );
-        assert_eq!(
-            ControlDecision::decide(&both_on_config, 2, ChainTemperature::Unknown).decision,
+            ControlDecision::decide(&both_on_config, 2, Temperature::Unknown).decision,
             ControlDecision::UseFixedSpeed(fan::Speed::FULL_SPEED)
         );
         assert_eq!(
@@ -1073,11 +899,7 @@ mod test {
             ControlDecision::Shutdown
         );
         assert_eq!(
-            ControlDecision::decide(&both_on_pid_config, 2, ChainTemperature::Failed).decision,
-            ControlDecision::Shutdown
-        );
-        assert_eq!(
-            ControlDecision::decide(&both_on_pid_config, 2, ChainTemperature::Unknown).decision,
+            ControlDecision::decide(&both_on_pid_config, 2, Temperature::Unknown).decision,
             ControlDecision::UseFixedSpeed(fan::Speed::FULL_SPEED)
         );
         assert_eq!(

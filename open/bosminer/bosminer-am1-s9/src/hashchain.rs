@@ -202,6 +202,40 @@ impl hal::BackendSolution for Solution {
     }
 }
 
+/// Helper structure for sending temperatures to Monitor
+#[derive(Debug)]
+struct S9Temp(sensor::Temperature);
+
+impl fmt::Display for S9Temp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{},{}",
+            self.0.local.to_string(),
+            self.0.remote.to_string()
+        )
+    }
+}
+
+impl monitor::SummaryTemperature for S9Temp {
+    fn summary_temperature(&self) -> monitor::Temperature {
+        match self.0.remote {
+            // remote is chip temperature
+            Measurement::Ok(t_remote) => match self.0.local {
+                Measurement::Ok(t_local) => monitor::Temperature::Ok(t_remote.max(t_local)),
+                _ => monitor::Temperature::Ok(t_remote),
+            },
+            _ => {
+                // fake chip temperature from local (PCB) temperature
+                match self.0.local {
+                    Measurement::Ok(t_local) => monitor::Temperature::Ok(t_local + 15.0),
+                    _ => monitor::Temperature::Unknown,
+                }
+            }
+        }
+    }
+}
+
 /// Helper method to calculate time to finish one piece of work
 ///
 /// * `n_midstates` - number of midstates
@@ -853,9 +887,9 @@ impl HashChain {
         loop {
             // Send heartbeat to monitor with "unknown" temperature
             self.monitor_tx
-                .unbounded_send(monitor::Message::Running(
+                .unbounded_send(monitor::Message::Running(Arc::new(S9Temp(
                     sensor::INVALID_TEMPERATURE_READING,
-                ))
+                ))))
                 .expect("send failed");
 
             delay_for(bosminer_antminer::monitor::TEMP_UPDATE_INTERVAL).await;
@@ -1002,7 +1036,7 @@ impl HashChain {
 
             // Send heartbeat to monitor
             self.monitor_tx
-                .unbounded_send(monitor::Message::Running(temp))
+                .unbounded_send(monitor::Message::Running(Arc::new(S9Temp(temp))))
                 .expect("send failed");
 
             delay_for(bosminer_antminer::monitor::TEMP_UPDATE_INTERVAL).await;
@@ -1117,6 +1151,8 @@ impl fmt::Display for HashChain {
 #[cfg(test)]
 mod test {
     use super::*;
+    use approx::assert_relative_eq;
+    use monitor::SummaryTemperature;
 
     /// Test work_time computation
     #[test]
@@ -1125,6 +1161,35 @@ mod test {
         assert_eq!(
             io::secs_to_fpga_ticks(calculate_work_delay_for_pll(1, 650_000_000)),
             36296
+        );
+    }
+
+    /// Test that faking S9 chip temperature from board temperature works
+    #[test]
+    fn test_summary_temperature() {
+        let temp = sensor::Temperature {
+            local: sensor::Measurement::Ok(10.0),
+            remote: sensor::Measurement::Ok(22.0),
+        };
+        match S9Temp(temp).summary_temperature() {
+            monitor::Temperature::Ok(t) => assert_relative_eq!(t, 22.0),
+            _ => panic!("missing temperature"),
+        };
+        let temp = sensor::Temperature {
+            local: sensor::Measurement::Ok(10.0),
+            remote: sensor::Measurement::OpenCircuit,
+        };
+        match S9Temp(temp).summary_temperature() {
+            monitor::Temperature::Ok(t) => assert_relative_eq!(t, 25.0),
+            _ => panic!("missing temperature"),
+        };
+        let temp = sensor::Temperature {
+            local: sensor::Measurement::InvalidReading,
+            remote: sensor::Measurement::OpenCircuit,
+        };
+        assert_eq!(
+            S9Temp(temp).summary_temperature(),
+            monitor::Temperature::Unknown
         );
     }
 }

@@ -317,7 +317,7 @@ impl RunningChain {
         );
         // we are in PID mode, check if temperature is OK
         match status.input_temperature {
-            monitor::ChainTemperature::Ok(t) => {
+            monitor::Temperature::Ok(t) => {
                 if t >= target_temp || target_temp - t < PREHEAT_TEMP_EPSILON {
                     info!("Preheat: temperature {} is hot enough", t);
                     return true;
