@@ -26,7 +26,6 @@ use ii_logging::macros::*;
 
 // TODO remove thread specific code
 use std::convert::TryInto;
-use std::process::Command;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -166,8 +165,7 @@ impl std::cmp::PartialOrd for Voltage {
 /// S9 devices have a single I2C master that manages the voltage controllers on all hashboards.
 /// Therefore, this will be a single communication instance.
 pub struct I2cBackend {
-    i2c_interface_num: usize,
-    inner: Mutex<Option<AsyncI2cDev>>,
+    inner: AsyncI2cDev,
 }
 
 impl I2cBackend {
@@ -185,11 +183,8 @@ impl I2cBackend {
     /// * `i2c_interface_num` - index of the I2C interface in Linux dev filesystem
     pub fn new(i2c_interface_num: usize) -> Self {
         Self {
-            i2c_interface_num,
-            inner: Mutex::new(Some(
-                AsyncI2cDev::open(format!("/dev/i2c-{}", i2c_interface_num))
-                    .expect("I2C instantiation failed"),
-            )),
+            inner: AsyncI2cDev::open(format!("/dev/i2c-{}", i2c_interface_num))
+                .expect("I2C instantiation failed"),
         }
     }
 
@@ -198,52 +193,23 @@ impl I2cBackend {
     async fn write_retry(&self, hashboard_idx: usize, data: u8) -> error::Result<()> {
         let mut tries_left: usize = Self::I2C_NUM_RETRIES;
         loop {
-            for i in 0..3usize {
-                let mut i2c_dev = self.inner.lock().await;
-                let ret = i2c_dev
-                    .as_ref()
-                    .expect("BUG: no i2c inside")
-                    .write(Self::get_i2c_address(hashboard_idx), vec![data])
-                    .await
-                    .map_err(|e| e.into());
-                if ret.is_ok() {
-                    if tries_left != Self::I2C_NUM_RETRIES {
-                        info!("I2C transaction on hashboard {} OK", hashboard_idx);
-                    }
-                    return ret;
-                }
-                tries_left -= 1;
-                if tries_left == 0 {
-                    return ret;
-                }
-                warn!(
-                    "I2C transaction on hashboard {} failed, retrying...",
-                    hashboard_idx
-                );
-                if i < 2 {
-                    drop(i2c_dev);
-                    delay_for(Self::I2C_RETRY_DELAY).await;
-                } else {
-                    warn!("Restarting I2C controller...");
-                    *i2c_dev = None;
-                    Command::new("sh")
-                        .arg("-c")
-                        .arg("devmem 0xF8000224 32 3")
-                        .output()
-                        .expect("failed to execute process");
-                    delay_for(Duration::from_millis(1500)).await;
-                    Command::new("sh")
-                        .arg("-c")
-                        .arg("devmem 0xF8000224 32 0")
-                        .output()
-                        .expect("failed to execute process");
-                    delay_for(Duration::from_millis(1000)).await;
-                    *i2c_dev = Some(
-                        AsyncI2cDev::open(format!("/dev/i2c-{}", self.i2c_interface_num))
-                            .expect("I2C instantiation failed"),
-                    );
-                }
+            let ret = self
+                .inner
+                .write(Self::get_i2c_address(hashboard_idx), vec![data])
+                .await
+                .map_err(|e| e.into());
+            if ret.is_ok() {
+                return ret;
             }
+            tries_left -= 1;
+            if tries_left == 0 {
+                return ret;
+            }
+            warn!(
+                "I2C transaction on hashboard {} failed, retrying...",
+                hashboard_idx
+            );
+            delay_for(Self::I2C_RETRY_DELAY).await;
         }
     }
 
@@ -271,10 +237,6 @@ impl I2cBackend {
         for _ in 0..length {
             let byte = self
                 .inner
-                .lock()
-                .await
-                .as_ref()
-                .expect("BUG: no i2c inside")
                 .read(Self::get_i2c_address(hashboard_idx), 1)
                 .await?;
             reply.push(byte[0]);
