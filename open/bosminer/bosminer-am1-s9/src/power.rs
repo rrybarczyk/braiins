@@ -26,6 +26,7 @@ use ii_logging::macros::*;
 
 // TODO remove thread specific code
 use std::convert::TryInto;
+use std::process::Command;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -91,35 +92,6 @@ pub const EXPECTED_VOLTAGE_CTRL_VERSION: u8 = 0x03;
 
 /// Path to voltage controller PIC program
 pub const PIC_PROGRAM_PATH: &'static str = "/lib/antminer/hash_s8_app.txt";
-
-use nix::sys::mman::{MapFlags, ProtFlags};
-use std::fs::OpenOptions;
-use std::os::unix::prelude::AsRawFd;
-
-fn devmem_write_u32(address: usize, value: u32) {
-    let f = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open("/dev/mem")
-        .expect("BUG: cannot open /dev/mem");
-
-    let page_size = 4096;
-    let raw_ptr = unsafe {
-        nix::sys::mman::mmap(
-            0 as *mut libc::c_void,
-            page_size,
-            ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-            MapFlags::MAP_SHARED,
-            f.as_raw_fd(),
-            (address & !(page_size - 1)) as libc::off_t,
-        )
-        .expect("BUG: failed to mmap /dev/mem")
-    };
-    let data_ptr = (raw_ptr as usize + (address & (page_size - 1))) as *mut libc::c_void;
-    let data_ptr = unsafe { &mut *(data_ptr as *mut u32) };
-    *data_ptr = value;
-    unsafe { nix::sys::mman::munmap(raw_ptr, page_size) }.expect("BUG: munmap failed");
-}
 
 /// Bundle voltage value with methods to convert it to/from various representations
 #[derive(Clone, Copy, PartialEq)]
@@ -254,9 +226,17 @@ impl I2cBackend {
                 } else {
                     warn!("Restarting I2C controller...");
                     *i2c_dev = None;
-                    devmem_write_u32(0xF8000224, 1);
+                    Command::new("sh")
+                        .arg("-c")
+                        .arg("devmem 0xF8000224 32 3")
+                        .output()
+                        .expect("failed to execute process");
                     delay_for(Duration::from_millis(1500)).await;
-                    devmem_write_u32(0xF8000224, 0);
+                    Command::new("sh")
+                        .arg("-c")
+                        .arg("devmem 0xF8000224 32 0")
+                        .output()
+                        .expect("failed to execute process");
                     delay_for(Duration::from_millis(1000)).await;
                     *i2c_dev = Some(
                         AsyncI2cDev::open(format!("/dev/i2c-{}", self.i2c_interface_num))
