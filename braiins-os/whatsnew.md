@@ -1,3 +1,12 @@
+## Overview
+
+This is a quick bugfix release that address problem with building the firmware locally.
+
+## All mining hardware types
+
+- [bug] build script has been simplified and produces SD card images directly from inside the docker run instead of generating bash scripts
+
+
 # 2020-04-30-0-259943b5
 
 ## Overview
