@@ -165,7 +165,7 @@ impl std::cmp::PartialOrd for Voltage {
 /// S9 devices have a single I2C master that manages the voltage controllers on all hashboards.
 /// Therefore, this will be a single communication instance.
 pub struct I2cBackend {
-    inner: AsyncI2cDev,
+    inner: Mutex<AsyncI2cDev>,
 }
 
 impl I2cBackend {
@@ -183,33 +183,41 @@ impl I2cBackend {
     /// * `i2c_interface_num` - index of the I2C interface in Linux dev filesystem
     pub fn new(i2c_interface_num: usize) -> Self {
         Self {
-            inner: AsyncI2cDev::open(format!("/dev/i2c-{}", i2c_interface_num))
-                .expect("I2C instantiation failed"),
+            inner: Mutex::new(
+                AsyncI2cDev::open(format!("/dev/i2c-{}", i2c_interface_num), true)
+                    .expect("I2C instantiation failed"),
+            ),
         }
     }
 
     /// Attempt to write a byte to power controller on I2C.
     /// If write fails then retry (at most `I2C_NUM_RETRIES`).
     async fn write_retry(&self, hashboard_idx: usize, data: u8) -> error::Result<()> {
-        let mut tries_left: usize = Self::I2C_NUM_RETRIES;
+        let mut try_num = 0;
         loop {
-            let ret = self
-                .inner
+            let inner = self.inner.lock().await;
+            try_num += 1;
+            let ret = inner
                 .write(Self::get_i2c_address(hashboard_idx), vec![data])
                 .await
                 .map_err(|e| e.into());
-            if ret.is_ok() {
-                return ret;
-            }
-            tries_left -= 1;
-            if tries_left == 0 {
+            if ret.is_ok() || try_num >= Self::I2C_NUM_RETRIES {
                 return ret;
             }
             warn!(
                 "I2C transaction on hashboard {} failed, retrying...",
                 hashboard_idx
             );
-            delay_for(Self::I2C_RETRY_DELAY).await;
+            if try_num % 3 == 0 {
+                // Every third attempt do a I2C controller reset
+                warn!("Resetting I2C controller...");
+                inner
+                    .reset_i2c_controller()
+                    .await
+                    .expect("BUG: I2C reset failed");
+            } else {
+                delay_for(Self::I2C_RETRY_DELAY).await;
+            }
         }
     }
 
@@ -237,6 +245,8 @@ impl I2cBackend {
         for _ in 0..length {
             let byte = self
                 .inner
+                .lock()
+                .await
                 .read(Self::get_i2c_address(hashboard_idx), 1)
                 .await?;
             reply.push(byte[0]);
