@@ -168,13 +168,15 @@ class Csvizer:
         """
         self.pull_groups(row)
         self.pull_hashchain_global(row)
-        self.pull_autotuning(row)
         self.pull_fanctl(row)
         self.pull_tempctl(row)
         # hashchains are currently hardcoded in bosminer
         self.pull_hashchain(row, 6)
         self.pull_hashchain(row, 7)
         self.pull_hashchain(row, 8)
+        # bosminer plus additional features
+        if self.cfg.get('format', {}).get('version', '').endswith('+'):
+            self.pull_autotuning(row)
 
     def push(self, row):
         """
@@ -183,12 +185,14 @@ class Csvizer:
         """
         self.push_groups(row)
         self.push_hashchain_global(row)
-        self.push_autotuning(row)
         self.push_fanctl(row)
         self.push_tempctl(row)
         self.push_hashchain(row, 6)
         self.push_hashchain(row, 7)
         self.push_hashchain(row, 8)
+        # options from plus will bug out regular bosminer
+        if self.cfg.get('format', {}).get('version', '').endswith('+'):
+            self.push_autotuning(row)
 
     # pools --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
     def pull_groups(self, row):
@@ -237,11 +241,9 @@ class Csvizer:
         row: dict to be populated with values pulled from config
         Otherwise logic is reverse of push.
         """
-        row['autotuning'] = toggle2str(
-            self.cfg.get('autotuning', {}).get('enabled', '')
-        )
+        row['autotuning'] = toggle2str(self.cfg.get('autotuning', {}).get('enabled'))
         row['power_limit'] = power_limit = self.cfg.get('autotuning', {}).get(
-            'psu_power_limit', 0
+            'psu_power_limit', ''
         )
 
     def push_autotuning(self, row):
@@ -456,7 +458,6 @@ class BosApi:
             raise ConfigFetchFailed(document)
         self.check_config(document.get('data'))
         return document['data']
-        print(response.content)
 
     def set_config(self, data):
         data['format']['generator'] = 'multiconfiger 0.1'  #
