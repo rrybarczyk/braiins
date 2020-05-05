@@ -1,5 +1,5 @@
 [package]
-name = "ii-sensors"
+name = "ii-hwmon"
 version = "0.1.0"
 authors = ["Braiins <braiins@braiins.com>"]
 license = "GPL-3.0-or-later"

@@ -810,14 +810,14 @@ impl HashChain {
 
     async fn try_to_initialize_sensor(
         command_context: command::Context,
-    ) -> error::Result<Box<dyn ii_sensors::Sensor>> {
+    ) -> error::Result<Box<dyn ii_hwmon::TempSensor>> {
         // construct I2C bus via command interface
         let i2c_bus = bm1387::i2c::Bus::new_and_init(command_context, TEMP_CHIP)
             .await
             .with_context(|_| ErrorKind::Sensors("bus construction failed".into()))?;
 
         // try to probe sensor
-        let sensor = ii_sensors::probe_i2c_sensors(i2c_bus)
+        let sensor = ii_hwmon::probe_i2c_temp_sensors(i2c_bus)
             .await
             .map_err(|e| error::Error::from(e))
             .with_context(|_| ErrorKind::Sensors("error when probing sensors".into()))?;

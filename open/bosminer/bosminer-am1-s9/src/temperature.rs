@@ -22,7 +22,7 @@
 
 //! S9 sensor structure implementation
 
-use ii_sensors::{self, Measurement};
+use ii_hwmon::{self, Value};
 
 use crate::monitor;
 use crate::sensor::SensorResult;
@@ -34,7 +34,7 @@ use std::fmt;
 pub struct Hashboard(pub(crate) SensorResult);
 
 impl Hashboard {
-    fn measurement(&self) -> Option<&ii_sensors::Temperature> {
+    fn measurement(&self) -> Option<&ii_hwmon::Reading> {
         match self.0 {
             SensorResult::Valid(ref m) => Some(m),
             _ => None,
@@ -70,14 +70,14 @@ impl monitor::SummaryTemperature for Hashboard {
         match &self.0 {
             SensorResult::Valid(ref temp) => match temp.remote {
                 // remote is chip temperature
-                Measurement::Ok(t_remote) => match temp.local {
-                    Measurement::Ok(t_local) => monitor::Temperature::Ok(t_remote.max(t_local)),
+                Value::Ok(t_remote) => match temp.local {
+                    Value::Ok(t_local) => monitor::Temperature::Ok(t_remote.max(t_local)),
                     _ => monitor::Temperature::Ok(t_remote),
                 },
                 _ => {
                     // fake chip temperature from local (PCB) temperature
                     match temp.local {
-                        Measurement::Ok(t_local) => monitor::Temperature::Ok(t_local + 15.0),
+                        Value::Ok(t_local) => monitor::Temperature::Ok(t_local + 15.0),
                         _ => monitor::Temperature::Unknown,
                     }
                 }
@@ -96,25 +96,25 @@ mod test {
     /// Test that faking S9 chip temperature from board temperature works
     #[test]
     fn test_summary_temperature() {
-        let sensor_result = Hashboard(SensorResult::Valid(ii_sensors::Temperature {
-            local: Measurement::Ok(10.0),
-            remote: Measurement::Ok(22.0),
+        let sensor_result = Hashboard(SensorResult::Valid(ii_hwmon::Reading {
+            local: Value::Ok(10.0),
+            remote: Value::Ok(22.0),
         }));
         match sensor_result.summary_temperature() {
             monitor::Temperature::Ok(t) => assert_relative_eq!(t, 22.0),
             _ => panic!("missing temperature"),
         };
-        let sensor_result = Hashboard(SensorResult::Valid(ii_sensors::Temperature {
-            local: Measurement::Ok(10.0),
-            remote: Measurement::OpenCircuit,
+        let sensor_result = Hashboard(SensorResult::Valid(ii_hwmon::Reading {
+            local: Value::Ok(10.0),
+            remote: Value::OpenCircuit,
         }));
         match sensor_result.summary_temperature() {
             monitor::Temperature::Ok(t) => assert_relative_eq!(t, 25.0),
             _ => panic!("missing temperature"),
         };
-        let sensor_result = Hashboard(SensorResult::Valid(ii_sensors::Temperature {
-            local: Measurement::InvalidReading,
-            remote: Measurement::OpenCircuit,
+        let sensor_result = Hashboard(SensorResult::Valid(ii_hwmon::Reading {
+            local: Value::InvalidReading,
+            remote: Value::OpenCircuit,
         }));
         assert_eq!(
             sensor_result.summary_temperature(),

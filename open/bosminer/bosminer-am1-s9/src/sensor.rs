@@ -22,7 +22,7 @@
 
 //! Temperature sensor reading and error correction strategy
 
-use ii_sensors::{self, Measurement};
+use ii_hwmon::{self, Value};
 
 use ii_logging::macros::*;
 
@@ -47,13 +47,13 @@ const MAX_SENSOR_ERRORS: usize = 10;
 pub enum SensorResult {
     NotInitialized,
     ReadFailed,
-    Valid(ii_sensors::Temperature),
+    Valid(ii_hwmon::Reading),
     Broken,
     NotPresent,
 }
 
 pub struct Sensor {
-    hw: Box<dyn ii_sensors::Sensor>,
+    hw: Box<dyn ii_hwmon::TempSensor>,
     name: String,
     is_broken: bool,
     error_average: f32,
@@ -61,7 +61,7 @@ pub struct Sensor {
 }
 
 impl Sensor {
-    pub fn new(name: String, hw: Box<dyn ii_sensors::Sensor>) -> Self {
+    pub fn new(name: String, hw: Box<dyn ii_hwmon::TempSensor>) -> Self {
         Self {
             hw,
             name,
@@ -99,22 +99,17 @@ impl Sensor {
         let mut attempts_left = MAX_TEMP_REREAD_ATTEMPTS;
         loop {
             // Read temperature sensor
-            match self
-                .hw
-                .read_temperature()
-                .await
-                .map_err(|e| error::Error::from(e))
-            {
+            match self.hw.read().await.map_err(|e| error::Error::from(e)) {
                 Ok(temp) => {
                     info!("Sensor {}: {:?}", self.name, temp);
 
                     let (local_error, local_temp) = match temp.local {
-                        Measurement::Ok(t) => (false, Some(t)),
+                        Value::Ok(t) => (false, Some(t)),
                         _ => (true, None),
                     };
                     let (remote_error, remote_temp) = match temp.remote {
-                        Measurement::NotPresent => (false, None),
-                        Measurement::Ok(t) => (false, Some(t)),
+                        Value::NotPresent => (false, None),
+                        Value::Ok(t) => (false, Some(t)),
                         _ => (true, None),
                     };
 
