@@ -23,7 +23,7 @@
 //! Driver implementation of sensor driver for TMP42x and similar sensors
 
 use super::Result;
-use super::{Measurement, Sensor, Temperature};
+use super::{Reading, TempSensor, Value};
 use ii_async_i2c as i2c;
 
 use packed_struct::prelude::*;
@@ -87,14 +87,14 @@ pub struct TMP42x {
 }
 
 impl TMP42x {
-    pub fn new(i2c_device: Box<dyn i2c::Device>, num_remote_sensors: usize) -> Box<dyn Sensor> {
+    pub fn new(i2c_device: Box<dyn i2c::Device>, num_remote_sensors: usize) -> Box<dyn TempSensor> {
         // TODO: If you are fixing this, you need to figure out sensor topology on hashboard
         assert_eq!(num_remote_sensors, 1);
         Box::new(Self {
             i2c_device,
             num_remote_sensors,
             discard_readings: None,
-        }) as Box<dyn Sensor>
+        }) as Box<dyn TempSensor>
     }
 
     /// Read temperature from one sensor, `index` determines which one:
@@ -103,7 +103,7 @@ impl TMP42x {
     ///
     /// Each sensor is represented by a pair of registers containing high-byte/low-byte of the
     /// temperature.
-    pub async fn read_one_sensor(&mut self, index: usize) -> Result<Measurement> {
+    pub async fn read_one_sensor(&mut self, index: usize) -> Result<Value> {
         assert!(index <= 3);
         let high = self
             .i2c_device
@@ -116,14 +116,14 @@ impl TMP42x {
         let low_bits = RegTempLowByte::unpack(&[low]).expect("LowByte unpacking failed");
 
         let result = if low_bits.temp_invalid {
-            Measurement::InvalidReading
+            Value::InvalidReading
         } else if low_bits.open_circuit {
-            Measurement::OpenCircuit
+            Value::OpenCircuit
         } else if high == 0 {
-            Measurement::ShortCircuit
+            Value::ShortCircuit
         } else {
             let t = (high as f32 - 64.0) + (low_bits.fract as f32 / 16.0);
-            Measurement::Ok(t)
+            Value::Ok(t)
         };
 
         Ok(result)
@@ -131,7 +131,7 @@ impl TMP42x {
 }
 
 #[async_trait]
-impl Sensor for TMP42x {
+impl TempSensor for TMP42x {
     /// Initialize temperature sensor - enable ext. range and all sensors
     async fn init(&mut self) -> Result<()> {
         // Eh, when setting the `RANGE` bit to 1, the change in temperature register format
@@ -167,7 +167,7 @@ impl Sensor for TMP42x {
     }
 
     /// Do a temperature reading from all supported sensors
-    async fn read_temperature(&mut self) -> Result<Temperature> {
+    async fn read(&mut self) -> Result<Reading> {
         // Mechanism to invalidate readings until "extended mode" is reflected in temp register
         match self.discard_readings {
             Some(bad_value) => {
@@ -175,9 +175,9 @@ impl Sensor for TMP42x {
                 let local_high_byte = self.i2c_device.read(REG_TEMP_HIGH_BASE).await?;
                 if local_high_byte == bad_value {
                     // Still bad value, invalidate reading
-                    return Ok(Temperature {
-                        local: Measurement::InvalidReading,
-                        remote: Measurement::InvalidReading,
+                    return Ok(Reading {
+                        local: Value::InvalidReading,
+                        remote: Value::InvalidReading,
                     });
                 }
                 // OK, all readings are valid from now on
@@ -190,7 +190,7 @@ impl Sensor for TMP42x {
         let local = self.read_one_sensor(0).await?;
         let remote = self.read_one_sensor(1).await?;
 
-        Ok(Temperature { local, remote })
+        Ok(Reading { local, remote })
     }
 }
 

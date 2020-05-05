@@ -20,8 +20,8 @@
 // of such proprietary license or if you have any other questions, please
 // contact us at opensource@braiins.com.
 
-//! This module contains interface for reading from sensor (`Sensor`) and what
-//! constitutes a sensor reading (`Temperature`, `Measurement`).
+//! This module contains interface for reading from sensor (`TempSensor`) and what
+//! constitutes a sensor reading (`Reading`, `Value`).
 
 mod tmp42x;
 mod tmp451;
@@ -49,43 +49,43 @@ pub type Result<T> = std::result::Result<T, self::Error>;
 
 /// Generic sensor
 #[async_trait]
-pub trait Sensor: Sync + Send {
-    /// Initialize the sensor (should be called at least once before first call to `read_temperature`
+pub trait TempSensor: Sync + Send {
+    /// Initialize the sensor (should be called at least once before first call to `read`)
     async fn init(&mut self) -> Result<()>;
 
     /// Read temperature from sensor
-    async fn read_temperature(&mut self) -> Result<Temperature>;
+    async fn read(&mut self) -> Result<Reading>;
 }
 
 /// Result of measuring temperature with remote sensor
 #[derive(Debug, PartialEq, Clone)]
-pub enum Measurement {
-    /// Sensor not present
+pub enum Value {
+    /// TempSensor not present
     NotPresent,
     /// Reading is invalid (due to under-power etc.)
     InvalidReading,
-    /// Sensor broke off
+    /// TempSensor broke off
     OpenCircuit,
-    /// Sensor is "shorted"
+    /// TempSensor is "shorted"
     ShortCircuit,
     /// OK, temperature in degree celsius
     Ok(f32),
 }
 
 /// Allow converting measurement into "valid temperature or nothing"
-impl From<Measurement> for Option<f32> {
-    fn from(m: Measurement) -> Self {
+impl From<Value> for Option<f32> {
+    fn from(m: Value) -> Self {
         match m {
-            Measurement::Ok(t) => Some(t),
+            Value::Ok(t) => Some(t),
             _ => None,
         }
     }
 }
 
-impl fmt::Display for Measurement {
+impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Measurement::Ok(t) => write!(f, "{:.0}°C", t),
+            Value::Ok(t) => write!(f, "{:.0}°C", t),
             _ => fmt::Debug::fmt(self, f),
         }
     }
@@ -93,12 +93,12 @@ impl fmt::Display for Measurement {
 
 /// Temperature reading
 #[derive(Debug, PartialEq, Clone)]
-pub struct Temperature {
+pub struct Reading {
     /// Local temperature (internal to the sensor) - usually present
-    pub local: Measurement,
+    pub local: Value,
 
     /// Remote aka external sensor - may fail or not be present at all
-    pub remote: Measurement,
+    pub remote: Value,
 }
 
 lazy_static! {
@@ -110,9 +110,9 @@ lazy_static! {
     ];
 }
 
-pub const INVALID_TEMPERATURE_READING: Temperature = Temperature {
-    local: Measurement::InvalidReading,
-    remote: Measurement::InvalidReading,
+pub const INVALID_TEMPERATURE_READING: Reading = Reading {
+    local: Value::InvalidReading,
+    remote: Value::InvalidReading,
 };
 
 /// Probe one I2C address for known sensor
@@ -122,7 +122,7 @@ pub const INVALID_TEMPERATURE_READING: Temperature = Temperature {
 /// changes to the "probe API" with each new sensor.
 pub async fn probe_i2c_device(
     mut i2c_device: Box<dyn i2c::Device>,
-) -> Result<Option<Box<dyn Sensor>>> {
+) -> Result<Option<Box<dyn TempSensor>>> {
     // Interesting SMBus registers
     const REG_MANUFACTURER_ID: u8 = 0xfe;
     const REG_DEVICE_ID: u8 = 0xff;
@@ -153,9 +153,9 @@ pub async fn probe_i2c_device(
 }
 
 /// Probe for known addresses for supported sensors
-pub async fn probe_i2c_sensors<T: 'static + i2c::Bus + Clone>(
+pub async fn probe_i2c_temp_sensors<T: 'static + i2c::Bus + Clone>(
     i2c_bus: T,
-) -> Result<Option<Box<dyn Sensor>>> {
+) -> Result<Option<Box<dyn TempSensor>>> {
     // Go through all known addresses
     for address in SENSOR_I2C_ADDRESS.iter() {
         // Construct device at given i2c address
@@ -189,7 +189,7 @@ mod test {
             Some(0xff),
         );
         let bus = i2c::SharedBus::new(bus);
-        let result = probe_i2c_sensors(bus).await.unwrap();
+        let result = probe_i2c_temp_sensors(bus).await.unwrap();
         result.is_some()
     }
 

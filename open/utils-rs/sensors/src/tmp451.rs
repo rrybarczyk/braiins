@@ -23,7 +23,7 @@
 //! Driver implementation of sensor driver for TMP451 and similar sensors
 
 use super::Result;
-use super::{Measurement, Sensor, Temperature};
+use super::{Reading, TempSensor, Value};
 use ii_async_i2c as i2c;
 
 use async_trait::async_trait;
@@ -52,10 +52,7 @@ fn make_temp(whole: u8, fract: u8) -> f32 {
 ///   temperature.
 ///   It makes sense even for sensors that are precise +- 1 degree (because they
 ///   have internal filtering.
-async fn read_temperature(
-    i2c_dev: &mut Box<dyn i2c::Device>,
-    use_fract: bool,
-) -> Result<Temperature> {
+async fn read_temperature(i2c_dev: &mut Box<dyn i2c::Device>, use_fract: bool) -> Result<Reading> {
     let status = i2c_dev.read(REG_STATUS).await?;
     let local_temp = i2c_dev.read(REG_LOCAL_TEMP).await?;
     let local_frac = if use_fract {
@@ -70,26 +67,26 @@ async fn read_temperature(
         0
     };
 
-    let local = Measurement::Ok(make_temp(local_temp, local_frac));
+    let local = Value::Ok(make_temp(local_temp, local_frac));
     let remote;
     if (status & STATUS_OPEN_CIRCUIT) != 0 {
-        remote = Measurement::OpenCircuit;
+        remote = Value::OpenCircuit;
     } else if remote_temp == 0 {
-        remote = Measurement::ShortCircuit;
+        remote = Value::ShortCircuit;
     } else {
-        remote = Measurement::Ok(make_temp(remote_temp, remote_frac))
+        remote = Value::Ok(make_temp(remote_temp, remote_frac))
     };
 
-    Ok(Temperature { local, remote })
+    Ok(Reading { local, remote })
 }
 
 /// Read only local temperature
-async fn read_temperature_local(i2c_dev: &mut Box<dyn i2c::Device>) -> Result<Temperature> {
+async fn read_temperature_local(i2c_dev: &mut Box<dyn i2c::Device>) -> Result<Reading> {
     let local_temp = i2c_dev.read(REG_LOCAL_TEMP).await?;
 
-    Ok(Temperature {
-        local: Measurement::Ok(make_temp(local_temp, 0)),
-        remote: Measurement::NotPresent,
+    Ok(Reading {
+        local: Value::Ok(make_temp(local_temp, 0)),
+        remote: Value::NotPresent,
     })
 }
 
@@ -107,18 +104,18 @@ pub struct TMP451 {
 }
 
 impl TMP451 {
-    pub fn new(i2c_dev: Box<dyn i2c::Device>) -> Box<dyn Sensor> {
-        Box::new(Self { i2c_dev }) as Box<dyn Sensor>
+    pub fn new(i2c_dev: Box<dyn i2c::Device>) -> Box<dyn TempSensor> {
+        Box::new(Self { i2c_dev }) as Box<dyn TempSensor>
     }
 }
 
 #[async_trait]
-impl Sensor for TMP451 {
+impl TempSensor for TMP451 {
     async fn init(&mut self) -> Result<()> {
         generic_init(&mut self.i2c_dev).await
     }
 
-    async fn read_temperature(&mut self) -> Result<Temperature> {
+    async fn read(&mut self) -> Result<Reading> {
         read_temperature(&mut self.i2c_dev, true).await
     }
 }
@@ -129,18 +126,18 @@ pub struct ADT7461 {
 }
 
 impl ADT7461 {
-    pub fn new(i2c_dev: Box<dyn i2c::Device>) -> Box<dyn Sensor> {
-        Box::new(Self { i2c_dev }) as Box<dyn Sensor>
+    pub fn new(i2c_dev: Box<dyn i2c::Device>) -> Box<dyn TempSensor> {
+        Box::new(Self { i2c_dev }) as Box<dyn TempSensor>
     }
 }
 
 #[async_trait]
-impl Sensor for ADT7461 {
+impl TempSensor for ADT7461 {
     async fn init(&mut self) -> Result<()> {
         generic_init(&mut self.i2c_dev).await
     }
 
-    async fn read_temperature(&mut self) -> Result<Temperature> {
+    async fn read(&mut self) -> Result<Reading> {
         read_temperature(&mut self.i2c_dev, false).await
     }
 }
@@ -151,18 +148,18 @@ pub struct NCT218 {
 }
 
 impl NCT218 {
-    pub fn new(i2c_dev: Box<dyn i2c::Device>) -> Box<dyn Sensor> {
-        Box::new(Self { i2c_dev }) as Box<dyn Sensor>
+    pub fn new(i2c_dev: Box<dyn i2c::Device>) -> Box<dyn TempSensor> {
+        Box::new(Self { i2c_dev }) as Box<dyn TempSensor>
     }
 }
 
 #[async_trait]
-impl Sensor for NCT218 {
+impl TempSensor for NCT218 {
     async fn init(&mut self) -> Result<()> {
         generic_init(&mut self.i2c_dev).await
     }
 
-    async fn read_temperature(&mut self) -> Result<Temperature> {
+    async fn read(&mut self) -> Result<Reading> {
         read_temperature_local(&mut self.i2c_dev).await
     }
 }
@@ -219,10 +216,10 @@ mod test {
         sensor.init().await.unwrap();
         check_config_ok(&mut dev).await;
         assert_eq!(
-            sensor.read_temperature().await.unwrap(),
-            Temperature {
-                local: Measurement::Ok(23.1875),
-                remote: Measurement::Ok(41.25),
+            sensor.read().await.unwrap(),
+            Reading {
+                local: Value::Ok(23.1875),
+                remote: Value::Ok(41.25),
             }
         );
 
@@ -232,10 +229,10 @@ mod test {
         sensor.init().await.unwrap();
         check_config_ok(&mut dev).await;
         assert_eq!(
-            sensor.read_temperature().await.unwrap(),
-            Temperature {
-                local: Measurement::Ok(23.0),
-                remote: Measurement::Ok(41.0),
+            sensor.read().await.unwrap(),
+            Reading {
+                local: Value::Ok(23.0),
+                remote: Value::Ok(41.0),
             }
         );
 
@@ -245,10 +242,10 @@ mod test {
         sensor.init().await.unwrap();
         check_config_ok(&mut dev).await;
         assert_eq!(
-            sensor.read_temperature().await.unwrap(),
-            Temperature {
-                local: Measurement::Ok(23.0),
-                remote: Measurement::NotPresent,
+            sensor.read().await.unwrap(),
+            Reading {
+                local: Value::Ok(23.0),
+                remote: Value::NotPresent,
             }
         );
     }
@@ -281,10 +278,10 @@ mod test {
         sensor.init().await.unwrap();
         check_config_ok(&mut dev).await;
         assert_eq!(
-            sensor.read_temperature().await.unwrap(),
-            Temperature {
-                local: Measurement::Ok(23.1875),
-                remote: Measurement::OpenCircuit,
+            sensor.read().await.unwrap(),
+            Reading {
+                local: Value::Ok(23.1875),
+                remote: Value::OpenCircuit,
             }
         );
 
@@ -294,10 +291,10 @@ mod test {
         sensor.init().await.unwrap();
         check_config_ok(&mut dev).await;
         assert_eq!(
-            sensor.read_temperature().await.unwrap(),
-            Temperature {
-                local: Measurement::Ok(23.0),
-                remote: Measurement::OpenCircuit,
+            sensor.read().await.unwrap(),
+            Reading {
+                local: Value::Ok(23.0),
+                remote: Value::OpenCircuit,
             }
         );
     }
@@ -329,10 +326,10 @@ mod test {
         sensor.init().await.unwrap();
         check_config_ok(&mut dev).await;
         assert_eq!(
-            sensor.read_temperature().await.unwrap(),
-            Temperature {
-                local: Measurement::Ok(23.1875),
-                remote: Measurement::ShortCircuit,
+            sensor.read().await.unwrap(),
+            Reading {
+                local: Value::Ok(23.1875),
+                remote: Value::ShortCircuit,
             }
         );
 
@@ -342,10 +339,10 @@ mod test {
         sensor.init().await.unwrap();
         check_config_ok(&mut dev).await;
         assert_eq!(
-            sensor.read_temperature().await.unwrap(),
-            Temperature {
-                local: Measurement::Ok(23.0),
-                remote: Measurement::ShortCircuit,
+            sensor.read().await.unwrap(),
+            Reading {
+                local: Value::Ok(23.0),
+                remote: Value::ShortCircuit,
             }
         );
     }
