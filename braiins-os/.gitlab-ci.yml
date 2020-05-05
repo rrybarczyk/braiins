@@ -50,17 +50,8 @@ braiins-os-build:
         # fly with detached heads produced by gitlab
         - eval sed "s/\{CI_JOB_TOKEN\}/${CI_JOB_TOKEN}/g" "$BOS_LOCAL_CONFIG" > .local.yml
 
-        # Build system files
-        - ./bb.py --platform $TARGET prepare
-        - ./bb.py --platform $TARGET clean
-        - ./bb.py --platform $TARGET prepare --update-feeds
-        - ./bb.py --platform $TARGET build
-        - ./bb.py --platform $TARGET deploy
-
-        # Create disk image
-        - ./mkimage.sh
-        - upgrade_file="braiins-os_am1-s9_ssh_$(./bb.py build-version).tar.gz"
-        - ./mkimage.sh output/$TARGET/sd output/$TARGET/upgrade/$upgrade_file output/$TARGET/
+        # run a clean os build and assemble sd card image
+        - ../braiins-os/build-release.sh $SIGNKEY
 
         # Cut down artifacts path
         - mv output/$TARGET ../$BOS_OUTPUT_DIR
