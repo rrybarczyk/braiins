@@ -22,19 +22,6 @@
 
 //! This module contains interface for reading from sensor (`Sensor`) and what
 //! constitutes a sensor reading (`Temperature`, `Measurement`).
-//!
-//! HOW TO EXTEND THIS IN THE FUTURE
-//!
-//! * Struct `Temperature` is not very generic and varies from sensor to sensor, so move it into
-//!   sensor drivers. Struct `Measurement` is OK for now, it represents more or less the outcomes
-//!   of temperature readout.
-//!
-//! * Each miner has a topology of sensors. It also has to know how to interpret the readout of
-//!   each sensor (ie. make a `IntoS9Temperature` trait and then implement
-//!   `IntoS9Temperature<TMP451SensorReadout>` and the like).
-//!
-//! * Maybe provide a generic temperature readout structure that has just the `local` and `remote`
-//!   portions (and make a conversion function when needed).
 
 mod tmp42x;
 mod tmp451;
