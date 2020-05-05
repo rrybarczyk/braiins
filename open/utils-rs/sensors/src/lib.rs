@@ -110,11 +110,6 @@ lazy_static! {
     ];
 }
 
-pub const INVALID_TEMPERATURE_READING: Reading = Reading {
-    local: Value::InvalidReading,
-    remote: Value::InvalidReading,
-};
-
 /// Probe one I2C address for known sensor
 ///
 /// The reason for not using unified API for driver probing is that the sensor detection logic
