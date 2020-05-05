@@ -35,6 +35,8 @@ from upgrade.ssh import SSHManager, SSHError
 from upgrade.transfer import wait_for_port
 from tempfile import TemporaryDirectory
 from glob import glob
+from getpass import getpass
+import csv
 
 USERNAME = 'root'
 PASSWORD = None
@@ -52,7 +54,7 @@ def detect_bos_mode(ssh):
     return mode
 
 
-def restore_firmware(args, ssh, backup_dir=None):
+def restore_firmware(args, host, ssh, backup_dir=None):
     mtdparts_params = platform.get_factory_mtdparts(args, ssh, backup_dir)
     mtdparts = list(backup.parse_mtdparts(mtdparts_params))
 
@@ -67,10 +69,10 @@ def restore_firmware(args, ssh, backup_dir=None):
         ssh.run('miner', 'run_recovery')
         # continue after miner is in the recovery mode
         print('Rebooting...', end='')
-        wait_for_port(args.hostname, 22, REBOOT_DELAY)
+        wait_for_port(host, 22, REBOOT_DELAY)
         print('Connecting to remote host...')
         # do not use host keys after restart because recovery mode has different keys for the same MAC
-        with SSHManager(args.hostname, USERNAME, PASSWORD, load_host_keys=False) as ssh:
+        with SSHManager(host, USERNAME, PASSWORD, load_host_keys=False) as ssh:
             args.mode = detect_bos_mode(ssh)
             if args.mode == backup.MODE_NAND:
                 print('Could not reboot to recovery mode!')
@@ -80,25 +82,46 @@ def restore_firmware(args, ssh, backup_dir=None):
 
 
 def main(args):
-    print('Connecting to remote host...')
-    with SSHManager(args.hostname, USERNAME, PASSWORD, load_host_keys=False) as ssh:
+    if args.batch and args.backup:
+        # Custom backups contain device mac address,
+        # restoring this en-masse may not be a good idea
+        sys.exit('Batch mode can not use custom backup.')
+
+    if args.batch:
+        try:
+            hosts = [row[0] for row in csv.reader(open(args.hostname))]
+        except Exception as ex:
+            sys.exit("Invalid input file: %s (%s)" % (args.hostname, ex))
+        if hosts and hosts[0] == "host":    # possibly skip csv header row
+            hosts = hosts[1:]
+
+        # user is not handled at all since we need root
+        # ssh wrapper may ask for password based on it's own logic, we just provide default
+        if args.install_password:
+            password = args.install_password
+        else:
+            password = getpass('Default password: ') or PASSWORD
+
+        for host in hosts:
+            uninstall(args, host, USERNAME, password)
+    else:
+        uninstall(args, args.hostname, USERNAME, args.install_password or PASSWORD)
+    pass
+
+
+def uninstall(args, host, username, password):
+    print('Connecting to %s...' % host)
+    with SSHManager(host, USERNAME, PASSWORD, load_host_keys=False) as ssh:
         args.mode = detect_bos_mode(ssh)
 
         backup_path = args.backup
         if not backup_path:
-            mac = backup.ssh_mac(ssh)
-            # try to find backup from default backup directory
-            backup_path = backup.get_output_dir(mac, date=False, create=False)
-            backup_path = sorted(glob('*{}*'.format(backup_path)), reverse=True)
-            if not backup_path:
-                # recover firmware without previous backup
-                restore_firmware(args, ssh)
-                return
-            backup_path = backup_path[0]
-            print('Found backup: {}'.format(backup_path))
+            # recover firmware without previous backup
+            restore_firmware(args, host, ssh)
+            return
 
         if os.path.isdir(backup_path):
-            restore_firmware(args, ssh, backup_path)
+            restore_firmware(args, host, ssh, backup_path)
         else:
             with TemporaryDirectory() as backup_dir:
                 tar = tarfile.open(backup_path)
@@ -110,15 +133,19 @@ def main(args):
                     print('Invalid backup tarball!')
                     return
                 backup_dir = os.path.split(uenv_path[0])[0]
-                restore_firmware(args, ssh, backup_dir)
+                restore_firmware(args, host, ssh, backup_dir)
 
 
 def build_arg_parser(parser):
     parser.description = 'Uninstall Braiins OS or Braiins OS+ from the mining machine.'
+    parser.add_argument('hostname', nargs='?',
+                        help='hostname of miner with bOS firmware')
+    parser.add_argument('--batch', action='store_true',
+                        help='path to file with list of hosts to install to')
     parser.add_argument('backup', nargs='?',
                         help='path to directory or tgz file with data for miner restore')
-    parser.add_argument('hostname',
-                        help='hostname of miner with bOS firmware')
+    parser.add_argument('--install-password',
+                        help='ssh password for installation')
 
     platform.add_restore_arguments(parser)
 
