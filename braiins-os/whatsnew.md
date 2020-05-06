@@ -1,3 +1,5 @@
+# 2020-04-30-2-b4a98a54
+
 ## Overview
 
 This is a quick bugfix release that address problem with building the firmware locally.
