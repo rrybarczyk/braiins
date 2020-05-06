@@ -45,4 +45,5 @@ echo Building $version signed by $signkey
 ./bb.py --platform $TARGET deploy
 
 upgrade_file="braiins-os_am1-s9_ssh_${version}.tar.gz"
-./mkimage.sh output/$TARGET/sd output/$TARGET/upgrade/$upgrade_file output/$TARGET/
+script_dir=`dirname $0`
+${script_dir}/mkimage.sh output/$TARGET/sd output/$TARGET/upgrade/$upgrade_file output/$TARGET/
