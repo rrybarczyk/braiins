@@ -340,12 +340,13 @@ class DmInfo(DeviceInfo):
 
 
 @async_context_manager
-def asyncssh_connect(host, port, passwords):
+async def asyncssh_connect(host, port, passwords):
     last_error = None
     for password in itertools.chain(passwords.get(host, []), passwords.get(ALL_HOSTS, [])):
         try:
-            conn, _ = yield from create_connection(None, host, port, username='root', password=password,
-                                                   known_hosts=None)
+            conn, _ = await create_connection(None, host, port, username='root',
+                                              password=password,
+                                              known_hosts=None)
             break
         except asyncssh.misc.DisconnectError as e:
             if e.code == asyncssh.DISC_NO_MORE_AUTH_METHODS_AVAILABLE:
@@ -435,8 +436,8 @@ class CommandManager:
             loop = asyncio.get_event_loop()
             loop.run_until_complete(asyncio.gather(discover(self._args, hostnames)))
             loop.close()
-        except (OSError, asyncssh.Error) as exc:
-            print('SSH connection failed: {}'.format(exc))
+        except Exception as exc:
+            print('Scan command failed: {}'.format(exc))
 
     def listen(self):
         s = socket(AF_INET, SOCK_DGRAM)
