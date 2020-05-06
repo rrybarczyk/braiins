@@ -73,7 +73,7 @@ cd braiins/braiins-os
 - Runs a full build for the current revision of the **braiins-os** release using a test signature key.
 
 ```
-./docker/build-release-in-docker.sh ./keys/test
+./docker/build-in-docker.sh ./keys/test
 ```
 
 ### Docker interactive mode
@@ -81,7 +81,7 @@ cd braiins/braiins-os
 Call the build release script without parameters to run the docker container in an interactive mode:
 
 ```
-./docker/build-release-in-docker.sh
+./docker/build-in-docker.sh
 ```
 
 This mode is intended mainly for testing purpose. The build environment is fully initialized and allows running all

@@ -22,27 +22,26 @@
 # of such proprietary license or if you have any other questions, please
 # contact us at opensource@braiins.com.
 
-# Purpose: release script for braiins OS firmware
-
-# The script:
-# - runs a build of braiins-os for all specified targets
-# - and generates scripts for packaging and signing the resulting build of
-#
-#
-# Synopsis: ./build-release.sh KEYRINGSECRET
-
 set -e
-TARGET=zynq-am1-s9
 
-signkey="${1:-keys/test}"
-version=$(./bb.py build-version)
-echo Building $version signed by $signkey
+MONOREPO_DIR=/src
+BOS_DIR=braiins-os
+RELEASE_BUILD_DIR=$MONOREPO_DIR/$BOS_DIR
 
-./bb.py --platform $TARGET prepare
-./bb.py --platform $TARGET clean
-./bb.py --platform $TARGET prepare --update-feeds
-./bb.py --platform $TARGET build --key $signkey
-./bb.py --platform $TARGET deploy
+DOCKER_SSH_AUTH_SOCK=/ssh-agent
+USER_NAME=build
+HOST_ROOT_DIR=$PWD/..
 
-upgrade_file="braiins-os_am1-s9_ssh_${version}.tar.gz"
-./mkimage.sh output/$TARGET/sd output/$TARGET/upgrade/$upgrade_file output/$TARGET/
+if [ $# -eq 0 ]; then
+    echo "Warning: Missing build release parameters!"
+    echo "Running only braiins OS build environment..."
+else
+    ARGS="./build.sh $@"
+fi
+
+docker run -it --rm \
+    -v $HOME/.ssh/known_hosts:/home/$USER_NAME/.ssh/known_hosts:ro \
+    -v $SSH_AUTH_SOCK:$DOCKER_SSH_AUTH_SOCK -e SSH_AUTH_SOCK=$DOCKER_SSH_AUTH_SOCK \
+    -v $HOST_ROOT_DIR:$MONOREPO_DIR -w $RELEASE_BUILD_DIR \
+    -e RELEASE_BUILD_DIR=$RELEASE_BUILD_DIR \
+    $USER/bos-builder $ARGS
