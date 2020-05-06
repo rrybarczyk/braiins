@@ -447,7 +447,8 @@ class Builder:
                     'platform': platform,
                     'target': split_platform[0],
                     'subtarget': split_platform[1],
-                    'subtarget_family': split_platform[1].split('-')[0]
+                    'subtarget_family': split_platform[1].split('-')[0],
+                    'build_version': config.build.version
                 }
                 # meta_branch cannot be used when repository is detached
                 if not repo_meta.head.is_detached:
