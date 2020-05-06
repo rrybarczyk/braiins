@@ -374,11 +374,8 @@ async def detect_device(args, hostname):
                     # print information about detected device
                     print(device_info.get_short())
                     break
-    except asyncssh.misc.DisconnectError:
-        return
-    except asyncio.futures.TimeoutError:
-        return
-    except asyncssh.process.ProcessError:
+    except Exception as exc:
+        print('Connection failed: {}'.format(exc))
         return
 
 
@@ -434,9 +431,12 @@ class CommandManager:
         hostnames = get_hostnames(self._args.hostname)
         self._args.passwords = get_passwords(self._args.passwords)
 
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(discover(self._args, hostnames))
-        loop.close()
+        try:
+            loop = asyncio.get_event_loop()
+            loop.run_until_complete(asyncio.gather(discover(self._args, hostnames)))
+            loop.close()
+        except (OSError, asyncssh.Error) as exc:
+            print('SSH connection failed: {}'.format(exc))
 
     def listen(self):
         s = socket(AF_INET, SOCK_DGRAM)
