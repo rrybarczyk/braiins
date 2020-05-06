@@ -29,19 +29,18 @@
 # - and generates scripts for packaging and signing the resulting build of
 #
 #
-# Synopsis: ./build.sh KEYRINGSECRET
+# Synopsis: ./build.sh
 
 set -e
 TARGET=zynq-am1-s9
 
-signkey="${1:-keys/test}"
 version=$(./bb.py build-version)
-echo Building $version signed by $signkey
+echo "Building $version..."
 
 ./bb.py --platform $TARGET prepare
 ./bb.py --platform $TARGET clean
 ./bb.py --platform $TARGET prepare --update-feeds
-./bb.py --platform $TARGET build --key $signkey
+./bb.py --platform $TARGET build
 ./bb.py --platform $TARGET deploy
 
 upgrade_file="braiins-os_am1-s9_ssh_${version}.tar.gz"

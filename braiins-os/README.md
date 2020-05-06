@@ -73,7 +73,7 @@ cd braiins/braiins-os
 - Runs a full build for the current revision of the **braiins-os** release using a test signature key.
 
 ```
-./docker/build-in-docker.sh ./keys/test
+./docker/build-in-docker.sh
 ```
 
 ### Docker interactive mode

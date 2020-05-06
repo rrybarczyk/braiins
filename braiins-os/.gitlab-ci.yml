@@ -51,7 +51,7 @@ braiins-os-build:
         - eval sed "s/\{CI_JOB_TOKEN\}/${CI_JOB_TOKEN}/g" "$BOS_LOCAL_CONFIG" > .local.yml
 
         # run a clean os build and assemble sd card image
-        - ../braiins-os/build-release.sh $SIGNKEY
+        - ./build.sh
 
         # Cut down artifacts path
         - mv output/$TARGET ../$BOS_OUTPUT_DIR
