@@ -68,6 +68,9 @@ def update_one(host, password):
         try:
             stdout, stderr = ssh.run('opkg install firmware')
         except CalledProcessError as ex:
+            return
+            # error is different on windows, unitl proper resolution we skip over
+            # TODO: this will essentially hide any other problems when execing firmware install
             if ex.returncode == -signal.SIGHUP:
                 # if all goes well update process reboots which kills ssh server
                 return

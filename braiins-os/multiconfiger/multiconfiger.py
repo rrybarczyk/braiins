@@ -67,35 +67,36 @@ def main(args):
 
     if args.action == 'load':
         tmp_table = args.table + '.tmp'
-        reader = csv.DictReader(open(args.table, newline=''), fields, restval='')
-        writer = csv.DictWriter(
-            open(tmp_table, 'w'), fields, restval='', dialect=reader.dialect
-        )
-        writer.writerow({k: k for k in fields})
+        with open(args.table, newline='') as reader_fd, open(tmp_table, 'w') as writer_fd:
+            reader = csv.DictReader(reader_fd, fields, restval='')
+            writer = csv.DictWriter(
+                writer_fd, fields, restval='', dialect=reader.dialect
+            )
+            writer.writerow({k: k for k in fields})
 
-        for line_no, row in enumerate(reader, 1):
-            host = row['host']
-            out = {'host': host}
-            try:
-                if (
-                    line_no == 1 and host == fields[0] or host == ''
-                ):  # skip first line with headers
-                    continue
-                print('Pulling from %s (%d/%d)' % (host, line_no, total))
-                api = BosApi(host, args.user, args.password)
-                cfg = api.get_config()
+            for line_no, row in enumerate(reader, 1):
+                host = row['host']
+                out = {'host': host}
+                try:
+                    if (
+                        line_no == 1 and host == fields[0] or host == ''
+                    ):  # skip first line with headers
+                        continue
+                    print('Pulling from %s (%d/%d)' % (host, line_no, total))
+                    api = BosApi(host, args.user, args.password)
+                    cfg = api.get_config()
 
-                # output row data
-                csvizer = Csvizer(cfg)
-                csvizer.pull(out)
-                writer.writerow(out)
-            except Exception as ex:
-                log_error(row)
-                if args.ignore:
-                    print(str(ex))
+                    # output row data
+                    csvizer = Csvizer(cfg)
+                    csvizer.pull(out)
                     writer.writerow(out)
-                else:
-                    raise
+                except Exception as ex:
+                    log_error(row)
+                    if args.ignore:
+                        print(str(ex))
+                        writer.writerow(out)
+                    else:
+                        raise
 
         if not args.check:
             # only replace original file once we are all done so as not to clobber it if error occurs
@@ -105,49 +106,51 @@ def main(args):
             os.unlink(tmp_table)
 
     elif args.action in ('save', 'save_apply'):
-        reader = csv.DictReader(open(args.table, newline=''), fields, restval='')
+        with open(args.table, newline='') as reader_fd:
+            reader = csv.DictReader(reader_fd, fields, restval='')
 
-        for line_no, row in enumerate(reader, 1):
-            try:
-                host = row['host']
-                if line_no == 1 and host == fields[0] or host == '':
-                    continue
-                print('Pushing to %s (%d/%d)' % (host, line_no, total))
+            for line_no, row in enumerate(reader, 1):
+                try:
+                    host = row['host']
+                    if line_no == 1 and host == fields[0] or host == '':
+                        continue
+                    print('Pushing to %s (%d/%d)' % (host, line_no, total))
 
-                api = BosApi(host, args.user, args.password)
-                cfg = api.get_config()
-                csvizer = Csvizer(cfg)
-                csvizer.push(row)
-                if not args.check:
-                    api.set_config(csvizer.cfg)
-                    if args.action == 'save_apply':
-                        api.apply_config()
-            except Exception as ex:
-                log_error(row)
-                if args.ignore:
-                    print(str(ex))
-                else:
-                    raise
+                    api = BosApi(host, args.user, args.password)
+                    cfg = api.get_config()
+                    csvizer = Csvizer(cfg)
+                    csvizer.push(row)
+                    if not args.check:
+                        api.set_config(csvizer.cfg)
+                        if args.action == 'save_apply':
+                            api.apply_config()
+                except Exception as ex:
+                    log_error(row)
+                    if args.ignore:
+                        print(str(ex))
+                    else:
+                        raise
 
     elif args.action == 'apply':
-        reader = csv.DictReader(open(args.table, newline=''), fields, restval='')
-        for line_no, row in enumerate(reader, 1):
-            try:
-                host = row['host']
-                if (
-                    line_no == 1 and host == fields[0] or host == ''
-                ):  # skip first line with headers
-                    continue
-                print('Applying on %s (%d/%d)' % (host, line_no, total))
-                api = BosApi(host, args.user, args.password)
-                if not args.check:
-                    api.apply_config()
-            except Exception as ex:
-                log_error(row)
-                if args.ignore:
-                    print(str(ex))
-                else:
-                    raise
+        with open(args.table, newline='') as reader_fd:
+            reader = csv.DictReader(reader_fd, fields, restval='')
+            for line_no, row in enumerate(reader, 1):
+                try:
+                    host = row['host']
+                    if (
+                        line_no == 1 and host == fields[0] or host == ''
+                    ):  # skip first line with headers
+                        continue
+                    print('Applying on %s (%d/%d)' % (host, line_no, total))
+                    api = BosApi(host, args.user, args.password)
+                    if not args.check:
+                        api.apply_config()
+                except Exception as ex:
+                    log_error(row)
+                    if args.ignore:
+                        print(str(ex))
+                    else:
+                        raise
 
     else:
         raise RuntimeError('unknown action')
