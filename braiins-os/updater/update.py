@@ -43,18 +43,23 @@ def main(args):
     for host in hosts:
         try:
             update_one(host, password)
-        except Exception as ex:
+        except UpdateFail as ex:
             error_count += 1
-            print('Updating %s failed (%s)' % (host, ex))
             if not args.ignore:
-                sys.exit(2)
+                raise
+            print('Updating %s failed: %s' % (host, ex))
         except CalledProcessError as ex:
             error_count += 1
             print(ex.stdout.read())
             print(ex.stderr.read())
-            print('Updating %s failed (%s)' % (host, ex.returncode))
             if not args.ignore:
-                sys.exit(3)
+                raise UpdateFail('process returned %d' % ex.returncode)
+            print('Updating %s failed (%s)' % (host, ex.returncode))
+        except Exception as ex:
+            error_count += 1
+            if not args.ignore:
+                raise
+            print('Updating %s failed (%s)' % (host, ex))
 
     if error_count:
         sys.exit('%d errors encountered' % error_count)
@@ -66,8 +71,15 @@ def update_one(host, password):
         stdout, stderr = ssh.run('opkg update')
         time.sleep(1)  # opkg may hold lock for a while
         try:
+            # if fw is up to date, command returns as usual
+            # if fw gets updated, ssh connection is killed
+            # since there is no way to distinguish lost connection
+            # from sucessful upgrade, things are considered fine as long as stderr is clear
             stdout, stderr = ssh.run('opkg install firmware')
         except CalledProcessError as ex:
+            error_msg = ex.stderr.read().decode('latin1').strip()
+            if error_msg:
+                raise UpdateFail(error_msg)
             return
             # error is different on windows, unitl proper resolution we skip over
             # TODO: this will essentially hide any other problems when execing firmware install
@@ -75,6 +87,14 @@ def update_one(host, password):
                 # if all goes well update process reboots which kills ssh server
                 return
             raise
+        # message about fw being fine contains version found, which may be useful to see
+        print(stdout.read().decode('latin1').rstrip())
+        error_msg = stderr.read().decode('latin1').strip()
+        if error_msg:
+            raise UpdateFail(error_msg)
+
+
+class UpdateFail(RuntimeError): pass
 
 
 def build_arg_parser(parser):

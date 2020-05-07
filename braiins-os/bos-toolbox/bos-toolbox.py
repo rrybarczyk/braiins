@@ -24,6 +24,7 @@
 
 import argparse
 import sys
+import warnings
 
 import upgrade2bos
 import restore2factory
@@ -57,6 +58,10 @@ def get_version():
 
 
 if __name__ == '__main__':
+    # rid of useless warning from paramiko
+    warnings.filterwarnings('ignore', category=UserWarning, module='paramiko')
+    warnings.filterwarnings('ignore', category=DeprecationWarning, module='paramiko')
+
     # execute only if run as a script
     parser = argparse.ArgumentParser(
         description='Provides tools for managing mining '
@@ -111,3 +116,6 @@ if __name__ == '__main__':
         sys.exit(3)
     except PlatformStop:
         sys.exit(4)
+    except Exception as ex:
+        multiconfiger.log_error()
+        sys.exit(str(ex))
