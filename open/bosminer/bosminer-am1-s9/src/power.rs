@@ -25,6 +25,7 @@ pub mod firmware;
 use ii_logging::macros::*;
 
 // TODO remove thread specific code
+use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::sync::Arc;
 use std::time::Duration;
@@ -37,6 +38,9 @@ use futures::lock::Mutex;
 use tokio::time::delay_for;
 
 use once_cell::sync::Lazy;
+
+/// For serializing `Voltage`
+use serde::{Deserialize, Serialize};
 
 /// Default initial voltage
 pub static OPEN_CORE_VOLTAGE: Lazy<Voltage> =
@@ -91,7 +95,9 @@ pub const EXPECTED_VOLTAGE_CTRL_VERSION: u8 = 0x03;
 pub const PIC_PROGRAM_PATH: &'static str = "/lib/antminer/hash_s8_app.txt";
 
 /// Bundle voltage value with methods to convert it to/from various representations
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(into = "u32")]
+#[serde(try_from = "u32")]
 pub struct Voltage(u8);
 
 impl Voltage {
@@ -143,6 +149,20 @@ impl Voltage {
     #[inline]
     pub fn as_pic_value(&self) -> u8 {
         self.0
+    }
+}
+
+impl TryFrom<u32> for Voltage {
+    type Error = error::Error;
+
+    fn try_from(value: u32) -> error::Result<Self> {
+        Voltage::from_volts(value as f32 / 1000.0)
+    }
+}
+
+impl From<Voltage> for u32 {
+    fn from(v: Voltage) -> u32 {
+        (v.as_volts() * 1000.0).round() as u32
     }
 }
 

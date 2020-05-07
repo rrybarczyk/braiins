@@ -24,9 +24,11 @@
 
 use std::fmt;
 
+use serde::{Deserialize, Serialize};
+
 type Frequency = usize;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct FrequencySettings {
     pub chip: Vec<Frequency>,
 }
