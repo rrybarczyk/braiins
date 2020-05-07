@@ -335,7 +335,7 @@ impl FlashBadcore {
     /// How many badcore information is stored here?
     const NUM_CHIPS: usize = 63;
 
-    pub fn parse(data: Vec<u8>) -> Option<Self> {
+    pub fn parse(data: &[u8]) -> Option<Self> {
         assert_eq!(data.len(), 0x40);
 
         // Is flash valid?
@@ -381,7 +381,7 @@ impl FlashFreq {
     /// How many badcore information is stored here?
     const NUM_CHIPS: usize = 63;
 
-    pub fn parse(data: Vec<u8>) -> Option<Self> {
+    pub fn parse(data: &[u8]) -> Option<Self> {
         assert_eq!(data.len(), 0x80);
 
         // Is flash valid?
@@ -409,6 +409,12 @@ impl FlashFreq {
     }
 }
 
+pub struct HashboardFlash {
+    pub badcore_flash: Option<FlashBadcore>,
+    pub freq_flash: Option<FlashFreq>,
+    pub checksum: u32,
+}
+
 /// Represents a voltage controller for a particular hashboard
 ///
 /// NOTE: Some I2C PIC commands require explicit wait time before issuing new
@@ -430,8 +436,7 @@ pub struct Control {
     /// Locks: first take this, then `backend`
     current_voltage: Mutex<Option<Voltage>>,
     /// Information from PIC flash
-    badcore_flash: Mutex<Option<FlashBadcore>>,
-    freq_flash: Mutex<Option<FlashFreq>>,
+    pub flash: Mutex<Option<HashboardFlash>>,
 }
 
 impl Control {
@@ -676,20 +681,26 @@ impl Control {
         Self {
             backend: Mutex::new(HashboardBackend::new(backend, hashboard_idx)),
             current_voltage: Mutex::new(None),
-            badcore_flash: Mutex::new(None),
-            freq_flash: Mutex::new(None),
+            flash: Mutex::new(None),
         }
     }
 
     async fn reset_and_start_app(&self) -> error::Result<u8> {
         self.reset().await?;
+
         // Dump PIC flash. This can be done only before jumping to app.
-        *self.badcore_flash.lock().await = FlashBadcore::parse(
-            self.read_flash(FlashBadcore::START, FlashBadcore::LEN)
-                .await?,
-        );
-        *self.freq_flash.lock().await =
-            FlashFreq::parse(self.read_flash(FlashFreq::START, FlashFreq::LEN).await?);
+        let badcore_flash_data = self
+            .read_flash(FlashBadcore::START, FlashBadcore::LEN)
+            .await?;
+        let freq_flash_data = self.read_flash(FlashFreq::START, FlashFreq::LEN).await?;
+
+        *self.flash.lock().await = Some(HashboardFlash {
+            checksum: crc::crc32::checksum_ieee(
+                &([&badcore_flash_data[..], &freq_flash_data[..]].concat()),
+            ),
+            badcore_flash: FlashBadcore::parse(&badcore_flash_data),
+            freq_flash: FlashFreq::parse(&freq_flash_data),
+        });
 
         self.jump_from_loader_to_app().await?;
         Ok(self.get_version().await?)

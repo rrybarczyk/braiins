@@ -238,6 +238,23 @@ impl RunningChain {
             .await
     }
 
+    /// TODO: for the love of god use macros or something
+    pub async fn get_flash_checksum(&self) -> u32 {
+        let inner = self.manager.inner.lock().await;
+        let flash = inner
+            .hash_chain
+            .as_ref()
+            .expect("BUG: hashchain is not running")
+            .voltage_ctrl
+            .flash
+            .lock()
+            .await;
+        flash
+            .as_ref()
+            .expect("BUG: missing flash in voltage controller")
+            .checksum
+    }
+
     pub async fn set_frequency(
         &self,
         frequency: &hashchain::FrequencySettings,
