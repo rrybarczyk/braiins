@@ -42,7 +42,7 @@ use chrono::prelude::DateTime;
 use chrono::Utc;
 use std::time::{Duration, UNIX_EPOCH};
 
-use ii_async_compat::prelude::*;
+use ii_async_compat::FutureExt;
 use tokio::time::delay_for;
 
 use crate::MidstateCount;

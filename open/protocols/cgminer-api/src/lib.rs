@@ -31,8 +31,6 @@ mod test;
 
 use ii_logging::macros::*;
 
-use ii_async_compat::{bytes, futures, tokio, tokio_util};
-
 use bytes::{Buf, BufMut, BytesMut};
 use futures::{SinkExt, StreamExt};
 use serde_json::Deserializer;

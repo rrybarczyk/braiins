@@ -34,7 +34,6 @@ use ii_logging::macros::*;
 
 use std::time::Duration;
 
-use ii_async_compat::tokio;
 use tokio::time::delay_for;
 
 /// Represents I2C bus that is implemented by sending chip commands
@@ -197,7 +196,6 @@ mod test {
     use std::sync::Arc;
 
     use futures::lock::Mutex;
-    use ii_async_compat::futures;
 
     /// This trait simulates "chip" on hashchain whose registers can be read or written.
     trait RegisterInterface: Send + Sync {

@@ -193,7 +193,6 @@ pub async fn probe_i2c_sensors<T: 'static + i2c::Bus + Clone>(
 mod test {
     use super::*;
     use i2c::test_utils;
-    use ii_async_compat::tokio;
 
     async fn test_probe_address(addr: u8, man_id: u8, dev_id: u8) -> bool {
         let bus = test_utils::FakeI2cBus::new(

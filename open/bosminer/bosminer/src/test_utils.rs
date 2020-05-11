@@ -34,7 +34,6 @@ pub use ii_bitcoin::{TestBlock, TEST_BLOCKS};
 use bosminer_macros::{ClientNode, MiningNode, WorkSolverNode};
 
 use futures::lock::Mutex;
-use ii_async_compat::futures;
 
 use std::fmt;
 use std::sync::{Arc, Mutex as StdMutex, MutexGuard as StdMutexGuard, Weak};
@@ -400,7 +399,6 @@ mod test {
     use super::*;
 
     use futures::executor::block_on;
-    use ii_async_compat::futures;
 
     fn get_engine(work_receiver: &mut work::EngineReceiver) -> Arc<dyn work::Engine> {
         block_on(work_receiver.get_engine()).expect("cannot get test work engine")

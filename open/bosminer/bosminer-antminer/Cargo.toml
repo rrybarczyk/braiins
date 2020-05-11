@@ -12,6 +12,8 @@ bosminer = { path = "../bosminer" }
 bosminer-macros = { path = "../bosminer-macros" }
 chrono = "0.4.9"
 failure = "0.1.5"
+futures = "0.3.5"
+tokio = { version = "0.2.20", features = ["full"] }
 ii-async-compat = { path = "../../utils-rs/async-compat" }
 ii-async-i2c = { path = "../../utils-rs/async-i2c" }
 ii-bitcoin = { path = "../../coins/bitcoin" }

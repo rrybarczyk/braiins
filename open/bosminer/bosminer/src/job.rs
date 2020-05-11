@@ -31,7 +31,6 @@ use crate::work;
 
 use futures::channel::mpsc;
 use futures::stream::StreamExt;
-use ii_async_compat::futures;
 
 use std::convert::TryInto;
 use std::fmt::Debug;

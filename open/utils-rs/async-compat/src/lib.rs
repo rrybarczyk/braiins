@@ -20,23 +20,7 @@
 // of such proprietary license or if you have any other questions, please
 // contact us at opensource@braiins.com.
 
-// Re-export futures and tokio
-pub use bytes;
-pub use futures;
-pub use tokio;
-pub use tokio_util;
-
-/// A general async prelude.
-///
-/// Re-exports `futures::prelude::*`, along with `tokio`, `tokio_util`
-/// and `FutureExt` (custom extensions).
-pub mod prelude {
-    pub use super::{bytes, futures, tokio, tokio_util, FutureExt as _};
-
-    pub use futures::prelude::*;
-    pub use tokio::io::{AsyncBufRead, AsyncRead, AsyncWrite};
-    pub use tokio::prelude::*;
-}
+//! Async utilities
 
 use std::error::Error as StdError;
 use std::fmt;
@@ -95,32 +79,6 @@ pub trait FutureExt: Future {
 }
 
 impl<F: Future> FutureExt for F {}
-
-/// Wrapper for `select!` macro from `futures`.
-/// The reason for this is that the macro needs to be told
-/// to look for futures at `::ii_async_compat::futures` rather than `::futures`.
-#[macro_export]
-macro_rules! select {
-    ($($tokens:tt)*) => {
-        futures::inner_macro::select! {
-            futures_crate_path(::ii_async_compat::futures)
-            $( $tokens )*
-        }
-    }
-}
-
-/// Wrapper for `join!` macro from `futures`.
-/// The reason for this is that the macro needs to be told
-/// to look for futures at `::ii_async_compat::futures` rather than `::futures`.
-#[macro_export]
-macro_rules! join {
-    ($($tokens:tt)*) => {
-        futures::inner_macro::join! {
-            futures_crate_path(::ii_async_compat::futures)
-            $( $tokens )*
-        }
-    }
-}
 
 /// Internal, used to signal termination via `trigger`
 /// and notify `Tasks` when that happens.
@@ -412,7 +370,6 @@ impl HaltHandle {
 
 #[cfg(test)]
 mod test {
-    use super::prelude::*;
     use super::*;
 
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -471,8 +428,10 @@ mod test {
 
         // Spawn a task that will halt()
         let handle2 = handle.clone();
-        handle.spawn(|_| async move {
-            handle2.halt();
+        handle.spawn(|_| {
+            async move {
+                handle2.halt();
+            }
         });
 
         // Join tasks
@@ -504,9 +463,11 @@ mod test {
                 // Spawn a couple of tasks on the handle
                 for _ in 0..NUM_TASKS {
                     let num_cancelled = num_cancelled.clone();
-                    handle.spawn(|tripwire| async move {
-                        forever_stream(tripwire).await;
-                        num_cancelled.fetch_add(1, Ordering::SeqCst);
+                    handle.spawn(|tripwire| {
+                        async move {
+                            forever_stream(tripwire).await;
+                            num_cancelled.fetch_add(1, Ordering::SeqCst);
+                        }
                     });
                 }
 
@@ -555,8 +516,10 @@ mod test {
     async fn test_halthandle_panic() {
         let handle = HaltHandle::new();
 
-        handle.spawn(|_| async {
-            panic!("Things aren't going well");
+        handle.spawn(|_| {
+            async {
+                panic!("Things aren't going well");
+            }
         });
 
         handle.ready();

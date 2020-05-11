@@ -37,7 +37,6 @@ use std::mem::size_of;
 use std::time::{self, Duration};
 
 use futures::executor::block_on;
-use ii_async_compat::futures;
 
 const CP210X_TYPE_OUT: u8 = 0x41;
 const CP210X_REQUEST_IFC_ENABLE: u8 = 0x00;

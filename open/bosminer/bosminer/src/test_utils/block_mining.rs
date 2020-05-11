@@ -38,13 +38,11 @@ use crate::work;
 
 use std::time::{Duration, Instant};
 
-use ii_async_compat::tokio;
 use tokio::time::delay_for;
 
 use futures::channel::mpsc;
 use futures::lock::Mutex;
 use futures::stream::StreamExt;
-use ii_async_compat::futures;
 
 use std::collections::HashMap;
 use std::sync::Arc;

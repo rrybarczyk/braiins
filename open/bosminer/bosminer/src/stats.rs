@@ -31,7 +31,6 @@ use bosminer_macros::{ClientStats, MiningStats, WorkSolverStats};
 use ii_stats::WindowedTimeMean;
 
 use futures::lock::Mutex;
-use ii_async_compat::{futures, tokio};
 use tokio::time::delay_for;
 
 use std::fmt::Debug;

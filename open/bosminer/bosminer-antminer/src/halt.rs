@@ -39,9 +39,11 @@ use error::ErrorKind;
 use futures::channel::mpsc;
 use futures::future::{select, Either};
 use futures::lock::Mutex;
-use ii_async_compat::prelude::*;
+use futures::prelude::*;
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::task;
+
+use ii_async_compat::FutureExt;
 
 /// Token sent by halted task to confirm that halting is done
 struct Done;

@@ -34,7 +34,7 @@ use ii_bitcoin::HashTrait as _;
 
 pub use solver::{Generator, SolutionSender, SolverBuilder};
 
-use ii_async_compat::prelude::*;
+use futures::prelude::*;
 use tokio::sync::watch;
 
 use once_cell::sync::OnceCell;

@@ -96,7 +96,6 @@ impl PicProgram {
 mod test {
     use super::*;
     use crate::power;
-    use ii_async_compat::tokio;
     use ii_logging::macros::*;
     use std::sync::Arc;
 

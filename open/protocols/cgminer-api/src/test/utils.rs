@@ -25,7 +25,6 @@ use crate::response;
 use crate::support;
 use crate::Codec;
 
-use ii_async_compat::{bytes, tokio_util};
 use tokio_util::codec::Decoder;
 
 use bytes::BytesMut;

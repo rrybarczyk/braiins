@@ -29,8 +29,6 @@ use crate::hal::{self, BackendConfig as _};
 use crate::hub;
 use crate::stats;
 
-use ii_async_compat::tokio;
-
 use std::sync::Arc;
 
 pub async fn main<T: hal::Backend>(backend_config: T::Config, signature: String) {

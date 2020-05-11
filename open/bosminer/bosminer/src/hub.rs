@@ -35,7 +35,6 @@ use crate::work;
 use futures::channel::mpsc;
 use futures::lock::Mutex;
 use futures::stream::StreamExt;
-use ii_async_compat::{futures, tokio};
 
 use std::sync::{Arc, Weak};
 

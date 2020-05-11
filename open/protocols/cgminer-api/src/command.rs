@@ -28,7 +28,7 @@ use crate::support::{MultiResponse, ResponseType, UnixTime, When};
 
 use serde_json as json;
 
-use ii_async_compat::futures::Future;
+use futures::prelude::*;
 
 use std::collections::HashMap;
 use std::marker;

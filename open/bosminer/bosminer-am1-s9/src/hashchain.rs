@@ -37,9 +37,6 @@ use std::time::Duration;
 
 use futures::channel::mpsc;
 use futures::lock::Mutex;
-use ii_async_compat::futures;
-
-use ii_async_compat::tokio;
 use tokio::sync::watch;
 use tokio::time::delay_for;
 

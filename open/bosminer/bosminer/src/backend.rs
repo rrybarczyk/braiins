@@ -26,7 +26,6 @@ use crate::node::{self, WorkSolverType};
 
 use async_trait::async_trait;
 use futures::lock::{Mutex, MutexGuard};
-use ii_async_compat::futures;
 
 use std::sync::Arc;
 

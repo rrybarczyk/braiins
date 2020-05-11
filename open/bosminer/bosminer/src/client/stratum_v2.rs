@@ -44,8 +44,8 @@ use bosminer_macros::ClientNode;
 use async_trait::async_trait;
 use futures::channel::mpsc;
 use futures::lock::Mutex;
-use ii_async_compat::prelude::*;
-use ii_async_compat::select;
+use futures::prelude::*;
+use futures::select;
 
 use std::collections::VecDeque;
 use std::fmt;
@@ -54,6 +54,7 @@ use std::sync::Mutex as StdMutex;
 use std::sync::{Arc, Weak};
 use std::time;
 
+use ii_async_compat::FutureExt;
 use ii_stratum::v2::messages::{
     NewMiningJob, OpenStandardMiningChannel, OpenStandardMiningChannelError,
     OpenStandardMiningChannelSuccess, Reconnect, SetNewPrevHash, SetTarget, SetupConnection,

@@ -20,8 +20,6 @@
 // of such proprietary license or if you have any other questions, please
 // contact us at opensource@braiins.com.
 
-use ii_async_compat::tokio;
-
 #[test]
 fn block_mining() {
     #[tokio::main(threaded_scheduler)]

@@ -26,8 +26,8 @@ use async_trait::async_trait;
 use bytes::BytesMut;
 use futures::channel::mpsc;
 
-use ii_async_compat::prelude::*;
-use ii_async_compat::{bytes, select};
+use futures::prelude::*;
+use futures::select;
 use ii_logging::macros::*;
 use ii_stratum::v2::{self, extensions, framing, telemetry::messages::*, types::*};
 

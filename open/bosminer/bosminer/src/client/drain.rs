@@ -35,8 +35,8 @@ use ii_stats::WindowedTimeMean;
 use async_trait::async_trait;
 use futures::channel::mpsc;
 use futures::lock::Mutex;
-use ii_async_compat::prelude::*;
-use ii_async_compat::select;
+use futures::prelude::*;
+use futures::select;
 use tokio::time::delay_for;
 
 use std::fmt;

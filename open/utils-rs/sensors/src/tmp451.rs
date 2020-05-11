@@ -171,7 +171,6 @@ impl Sensor for NCT218 {
 mod test {
     use super::*;
     use i2c::test_utils::InitReg;
-    use ii_async_compat::tokio;
 
     /// Make sensor T with data being read/written from memory `data`
     fn make_i2c_device(

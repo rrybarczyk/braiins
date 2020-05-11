@@ -25,7 +25,7 @@
 use std::pin::Pin;
 use tokio::net::TcpStream;
 
-use ii_async_compat::prelude::*;
+use futures::prelude::*;
 use ii_logging::macros::*;
 use ii_stratum::v2;
 

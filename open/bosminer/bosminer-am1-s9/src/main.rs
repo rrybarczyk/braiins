@@ -27,8 +27,6 @@ use bosminer_am1_s9::config;
 use bosminer_config::clap;
 use bosminer_config::{ClientDescriptor, ClientUserInfo, GroupConfig, PoolConfig};
 
-use ii_async_compat::tokio;
-
 #[tokio::main]
 async fn main() {
     let app = clap::App::new(bosminer::SIGNATURE)

@@ -37,7 +37,6 @@ use std::time::Duration;
 use packed_struct::{PackedStruct, PackedStructSlice};
 
 use futures::lock::Mutex;
-use ii_async_compat::futures;
 use std::sync::Arc;
 
 use crate::error::{self, ErrorKind};

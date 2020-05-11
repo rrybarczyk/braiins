@@ -10,7 +10,6 @@ use std::ops;
 use std::os::unix::prelude::AsRawFd;
 use std::time::{Duration, Instant};
 
-use ii_async_compat::tokio;
 use tokio::io::AsyncReadExt;
 
 use libc;

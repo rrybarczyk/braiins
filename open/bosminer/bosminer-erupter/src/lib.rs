@@ -37,7 +37,6 @@ use bosminer_macros::WorkSolverNode;
 
 use error::ErrorKind;
 
-use ii_async_compat::tokio;
 use tokio::task;
 
 use std::fmt;

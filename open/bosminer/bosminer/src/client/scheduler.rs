@@ -26,7 +26,7 @@ use crate::work;
 
 use futures::channel::mpsc;
 use futures::lock::{Mutex, MutexGuard};
-use ii_async_compat::{futures, FutureExt};
+use ii_async_compat::FutureExt;
 
 use std::sync::Arc;
 use std::time;

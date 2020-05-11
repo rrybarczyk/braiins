@@ -29,7 +29,7 @@ pub mod v1;
 use std::pin::Pin;
 use tokio::net::TcpStream;
 
-use ii_async_compat::prelude::*;
+use futures::prelude::*;
 use ii_stratum::v2::{DynFramedSink, DynFramedStream};
 
 use crate::error;

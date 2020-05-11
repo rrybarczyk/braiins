@@ -18,6 +18,8 @@ ii-cgminer-api = { path = "../../protocols/cgminer-api" }
 ii-fpga-io-am1-s9 = { path = "../../hw/zynq-io-am1-s9/fpga-io" }
 ii-logging = { path = "../../utils-rs/logging" }
 ii-sensors = { path = "../../utils-rs/sensors" }
+futures = "0.3.5"
+tokio = { version = "0.2.20", features = ["full"] }
 failure = "0.1.5"
 lazy_static = "1.3"
 packed_struct="0.3"

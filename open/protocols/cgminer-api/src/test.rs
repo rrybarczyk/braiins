@@ -31,8 +31,6 @@ use crate::response;
 
 use utils::{assert_json_eq, codec_roundtrip};
 
-use ii_async_compat::tokio;
-
 use serde::Serialize;
 use serde_json as json;
 

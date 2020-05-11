@@ -47,7 +47,6 @@ use bosminer_config::{
 
 use futures::channel::mpsc;
 use futures::lock::Mutex;
-use ii_async_compat::futures;
 
 use std::slice;
 use std::sync::atomic::{AtomicBool, Ordering};

@@ -34,8 +34,6 @@ use crate::halt;
 use ii_linux_async_i2c::AsyncI2cDev;
 
 use futures::lock::Mutex;
-use ii_async_compat::futures;
-use ii_async_compat::tokio;
 use tokio::time::delay_for;
 
 use once_cell::sync::Lazy;

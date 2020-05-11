@@ -26,7 +26,6 @@ use crate::node;
 
 use futures::channel::mpsc;
 use futures::lock::Mutex;
-use ii_async_compat::futures;
 
 use std::sync::{Arc, Weak};
 use std::time;

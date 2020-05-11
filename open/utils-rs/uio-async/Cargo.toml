@@ -9,7 +9,7 @@ license = "MIT"
 edition = "2018"
 
 [dependencies]
-ii-async-compat = { path = "../../utils-rs/async-compat" }
+tokio = { version = "0.2.20", features = ["full"] }
 nix = "0.14.1"
 libc = "0.2"
 timeout-readwrite = "0.2.1"

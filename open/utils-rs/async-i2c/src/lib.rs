@@ -30,7 +30,6 @@ use std::sync::Arc;
 use thiserror::Error;
 
 use futures::lock::Mutex;
-use ii_async_compat::futures;
 
 /// Local error definition
 #[derive(Error, Debug)]
@@ -191,7 +190,6 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use ii_async_compat::tokio;
 
     #[test]
     #[should_panic]

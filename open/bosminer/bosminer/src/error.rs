@@ -26,8 +26,6 @@ mod client;
 
 pub use client::ErrorKind as Client;
 
-use ii_async_compat::prelude::*;
-
 use failure::{Backtrace, Context, Fail};
 use std::fmt::{self, Debug, Display};
 

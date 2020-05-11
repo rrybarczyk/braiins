@@ -29,7 +29,6 @@ use futures::channel::mpsc;
 use futures::channel::oneshot;
 use futures::executor::block_on;
 use futures::stream::StreamExt;
-use ii_async_compat::{futures, tokio};
 use tokio::task;
 
 /// For devmem
