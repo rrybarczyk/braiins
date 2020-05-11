@@ -67,7 +67,9 @@ def main(args):
 
     if args.action == 'load':
         tmp_table = args.table + '.tmp'
-        with open(args.table, newline='') as reader_fd, open(tmp_table, 'w') as writer_fd:
+        with open(args.table, newline='') as reader_fd, open(
+            tmp_table, 'w', newline=''
+        ) as writer_fd:
             reader = csv.DictReader(reader_fd, fields, restval='')
             writer = csv.DictWriter(
                 writer_fd, fields, restval='', dialect=reader.dialect
@@ -75,7 +77,7 @@ def main(args):
             writer.writerow({k: k for k in fields})
 
             for line_no, row in enumerate(reader, 1):
-                host = row['host']
+                host = row['host'].strip()
                 out = {'host': host}
                 try:
                     if (
@@ -111,7 +113,7 @@ def main(args):
 
             for line_no, row in enumerate(reader, 1):
                 try:
-                    host = row['host']
+                    host = row['host'].strip()
                     if line_no == 1 and host == fields[0] or host == '':
                         continue
                     print('Pushing to %s (%d/%d)' % (host, line_no, total))
@@ -136,7 +138,7 @@ def main(args):
             reader = csv.DictReader(reader_fd, fields, restval='')
             for line_no, row in enumerate(reader, 1):
                 try:
-                    host = row['host']
+                    host = row['host'].strip()
                     if (
                         line_no == 1 and host == fields[0] or host == ''
                     ):  # skip first line with headers

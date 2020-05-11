@@ -105,7 +105,7 @@ def main(args):
 
     if args.batch:
         try:
-            hosts = [row[0] for row in csv.reader(open(args.batch))]
+            hosts = [row[0].strip() for row in csv.reader(open(args.batch)) if row and row[0].strip()]
         except Exception as ex:
             sys.exit("Invalid input file: %s (%s)" % (args.batch, ex))
         if hosts and hosts[0] == "host":    # possibly skip csv header row

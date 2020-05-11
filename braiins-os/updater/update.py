@@ -29,7 +29,9 @@ def main(args):
             password = getpass('Default password: ') or ''
 
         try:
-            hosts = [row[0] for row in csv.reader(open(args.batch))]
+            hosts = [
+                row[0] for row in csv.reader(open(args.batch)) if row and row[0].strip()
+            ]
         except Exception as ex:
             sys.exit('Invalid input file: %s (%s)' % (args.batch, ex))
 
@@ -73,22 +75,20 @@ def update_one(host, password):
         try:
             # if fw is up to date, command returns as usual
             # if fw gets updated, ssh connection is killed
-            # since there is no way to distinguish lost connection
-            # from sucessful upgrade, things are considered fine as long as stderr is clear
             stdout, stderr = ssh.run('opkg install firmware')
         except CalledProcessError as ex:
             error_msg = ex.stderr.read().decode('latin1').strip()
-            if error_msg:
-                raise UpdateFail(error_msg)
-            return
-            # error is different on windows, unitl proper resolution we skip over
-            # TODO: this will essentially hide any other problems when execing firmware install
-            if ex.returncode == -signal.SIGHUP:
-                # if all goes well update process reboots which kills ssh server
+            std_msg = ex.stdout.read().decode('latin1').strip()
+            # this signifies start of system upgrade
+            if 'Running system upgrade' in std_msg:
                 return
-            raise
+            # now this is unexpected
+            print(std_msg)  # dump out what was received on stdout, just in case
+            raise UpdateFail(error_msg)
+
         # message about fw being fine contains version found, which may be useful to see
         print(stdout.read().decode('latin1').rstrip())
+        # since machine was not rebooted, errors may actualy be errors
         error_msg = stderr.read().decode('latin1').strip()
         if error_msg:
             raise UpdateFail(error_msg)
