@@ -36,24 +36,20 @@ pub mod prelude {
     pub use futures::prelude::*;
     pub use tokio::io::{AsyncBufRead, AsyncRead, AsyncWrite};
     pub use tokio::prelude::*;
-
-    pub use stream_cancel::{StreamExt as _, Tripwire};
 }
-
-pub use stream_cancel::{self, Tripwire};
 
 use std::error::Error as StdError;
 use std::fmt;
 use std::panic::{self, PanicInfo};
+use std::pin::Pin;
 use std::process;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Once;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Once};
+use std::task::{Context, Poll};
 use std::time::Duration;
 
 use futures::prelude::*;
-use stream_cancel::Trigger;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{mpsc, watch, Notify};
 use tokio::task::{JoinError, JoinHandle};
 use tokio::{signal, time};
 
@@ -131,7 +127,7 @@ macro_rules! join {
 #[derive(Debug)]
 struct Halt {
     trigger: Trigger,
-    notify_tx: oneshot::Sender<()>,
+    notify_join: Arc<Notify>,
 }
 
 /// Internal, used in the `Tasks` channel,
@@ -154,7 +150,7 @@ enum TaskMsg {
 #[derive(Debug)]
 struct Tasks {
     tasks_rx: mpsc::UnboundedReceiver<TaskMsg>,
-    halt_notify_rx: oneshot::Receiver<()>,
+    notify_join: Arc<Notify>,
 }
 
 /// Error type returned by `HaltHandle::join()`.
@@ -195,6 +191,44 @@ impl StdError for HaltError {
     }
 }
 
+/// A synchronization end that can be used to
+/// cancel tasks which use the associated `Tripwire` instance.
+///
+/// NB. This is really just a thin wrapper around `watch::Sender`.
+#[derive(Debug)]
+pub struct Trigger(watch::Sender<()>);
+
+impl Trigger {
+    pub fn cancel(self) {
+        let _ = self.0.broadcast(());
+    }
+}
+
+/// A synchronization end that tasks can use to wait on
+/// using eg. `take_until()` or `select!()` or similar
+/// to await cancellation.
+///
+/// NB. This is really just a thin wrapper around `watch::Receiver`.
+#[derive(Clone, Debug)]
+pub struct Tripwire(watch::Receiver<()>);
+
+impl Tripwire {
+    pub fn new() -> (Trigger, Self) {
+        let (trigger, tripwire) = watch::channel(());
+        (Trigger(trigger), Self(tripwire))
+    }
+}
+
+impl Future for Tripwire {
+    type Output = ();
+
+    fn poll(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<()> {
+        let mut this = self.as_mut();
+        let mut next = this.0.next();
+        Pin::new(&mut next).poll(ctx).map(|_| ())
+    }
+}
+
 /// A handle with which tasks can be spawned and then halted.
 ///
 /// # Usage
@@ -213,7 +247,7 @@ impl StdError for HaltError {
 /// a race condition as long as `ready()` is called in the right moment.
 #[derive(Debug)]
 pub struct HaltHandle {
-    /// `stream-cancels` tripwire that is cloned into
+    /// Tripwire that is cloned into
     /// 'child' tasks when they are started with this handle.
     tripwire: Tripwire,
     /// Used to trigger the tripwire and then notifies `tasks`.
@@ -231,16 +265,19 @@ impl HaltHandle {
     /// Create a new `HaltHandle`
     pub fn new() -> Self {
         let (trigger, tripwire) = Tripwire::new();
-        let (notify_tx, halt_notify_rx) = oneshot::channel();
+        let notify_join = Arc::new(Notify::new());
         let (tasks_tx, tasks_rx) = mpsc::unbounded_channel();
 
         Self {
             tripwire,
-            halt: Mutex::new(Some(Halt { trigger, notify_tx })),
+            halt: Mutex::new(Some(Halt {
+                trigger,
+                notify_join: notify_join.clone(),
+            })),
             tasks_tx,
             tasks: Mutex::new(Some(Tasks {
                 tasks_rx,
-                halt_notify_rx,
+                notify_join,
             })),
             ctrlc_task_spawned: AtomicBool::new(false),
         }
@@ -281,9 +318,14 @@ impl HaltHandle {
 
     /// Tell the handle to halt all the associated tasks.
     pub fn halt(&self) {
-        if let Some(halt) = self.halt.lock().unwrap().take() {
+        if let Some(halt) = self
+            .halt
+            .lock()
+            .expect("BUG: HaltHandle: Poisoned mutex")
+            .take()
+        {
             halt.trigger.cancel();
-            halt.notify_tx.send(()).unwrap();
+            halt.notify_join.notify();
         }
     }
 
@@ -307,7 +349,9 @@ impl HaltHandle {
         {
             let ft = f(self);
             tokio::spawn(async move {
-                signal::ctrl_c().await.expect("Error listening for SIGINT");
+                signal::ctrl_c()
+                    .await
+                    .expect("BUG: Error listening for SIGINT");
                 ft.await;
             });
         }
@@ -328,10 +372,11 @@ impl HaltHandle {
         let mut tasks = self
             .tasks
             .lock()
-            .unwrap()
+            .expect("BUG: HaltHandle: Poisoned mutex")
             .take()
-            .expect("HaltHandle: join() called multiple times");
-        let _ = tasks.halt_notify_rx.await;
+            .expect("BUG: HaltHandle: join() called multiple times");
+
+        let _ = tasks.notify_join.notified().await;
 
         // Collect join handles. Join handles are added to the
         // tasks channel by Self::spawn(). After the user decides all
@@ -380,11 +425,11 @@ mod test {
         let timeout = Duration::from_millis(100);
 
         let future = future::pending::<()>().timeout(timeout);
-        future.await.expect_err("Timeout expected");
+        future.await.expect_err("BUG: Timeout expected");
 
         let mut stream = stream::pending::<()>();
         let future = stream.next().timeout(timeout);
-        future.await.expect_err("Timeout expected");
+        future.await.expect_err("BUG: Timeout expected");
     }
 
     /// Wait indefinitely on a stream with a `Tripwire` for cancellation.
@@ -410,7 +455,7 @@ mod test {
         // Signal ready, halt, and join tasks
         handle.ready();
         handle.halt();
-        handle.join(None).await.expect("join() failed");
+        handle.join(None).await.expect("BUG: join() failed");
     }
 
     // The same as basic test but with halting happening from within a task.
@@ -426,15 +471,13 @@ mod test {
 
         // Spawn a task that will halt()
         let handle2 = handle.clone();
-        handle.spawn(|_| {
-            async move {
-                handle2.halt();
-            }
+        handle.spawn(|_| async move {
+            handle2.halt();
         });
 
         // Join tasks
         handle.ready();
-        handle.join(None).await.expect("join() failed");
+        handle.join(None).await.expect("BUG: join() failed");
     }
 
     // Test that spawn() / halt() / join() is not racy when ready()
@@ -461,11 +504,9 @@ mod test {
                 // Spawn a couple of tasks on the handle
                 for _ in 0..NUM_TASKS {
                     let num_cancelled = num_cancelled.clone();
-                    handle.spawn(|tripwire| {
-                        async move {
-                            forever_stream(tripwire).await;
-                            num_cancelled.fetch_add(1, Ordering::SeqCst);
-                        }
+                    handle.spawn(|tripwire| async move {
+                        forever_stream(tripwire).await;
+                        num_cancelled.fetch_add(1, Ordering::SeqCst);
                     });
                 }
 
@@ -475,7 +516,7 @@ mod test {
         }
 
         // Join tasks
-        handle.join(None).await.expect("join() failed");
+        handle.join(None).await.expect("BUG: join() failed");
 
         let num_cancelled = num_cancelled.load(Ordering::SeqCst);
         assert_eq!(num_cancelled, NUM_TASKS);
@@ -503,7 +544,7 @@ mod test {
         match &res {
             Err(HaltError::Timeout) => (),
             _ => panic!(
-                "join result was supposed to be HaltError::Timeout but was instead: {:?}",
+                "BUG: join result was supposed to be HaltError::Timeout but was instead: {:?}",
                 res
             ),
         }
@@ -514,10 +555,8 @@ mod test {
     async fn test_halthandle_panic() {
         let handle = HaltHandle::new();
 
-        handle.spawn(|_| {
-            async {
-                panic!("Things aren't going well");
-            }
+        handle.spawn(|_| async {
+            panic!("Things aren't going well");
         });
 
         handle.ready();
@@ -528,7 +567,7 @@ mod test {
         match &res {
             Err(HaltError::Join(_)) => (),
             _ => panic!(
-                "join result was supposed to be HaltError::Join but was instead: {:?}",
+                "BUG: join result was supposed to be HaltError::Join but was instead: {:?}",
                 res
             ),
         }
