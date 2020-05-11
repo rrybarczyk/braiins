@@ -37,7 +37,7 @@ use std::sync::Arc;
 use futures::channel::mpsc;
 use futures::stream::StreamExt;
 
-use ii_async_compat::FutureExt;
+use ii_async_utils::FutureExt;
 use tokio::time::delay_for;
 
 const ASIC_DIFFICULTY: usize = 1;

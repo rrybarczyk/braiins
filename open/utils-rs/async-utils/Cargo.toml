@@ -1,5 +1,5 @@
 [package]
-name = "ii-async-compat"
+name = "ii-async-utils"
 version = "0.2.0"
 authors = ["Braiins <braiins@braiins.com>"]
 license = "GPL-3.0-or-later"

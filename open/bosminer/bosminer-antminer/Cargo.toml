@@ -14,7 +14,7 @@ chrono = "0.4.9"
 failure = "0.1.5"
 futures = "0.3.5"
 tokio = { version = "0.2.20", features = ["full"] }
-ii-async-compat = { path = "../../utils-rs/async-compat" }
+ii-async-utils = { path = "../../utils-rs/async-utils" }
 ii-async-i2c = { path = "../../utils-rs/async-i2c" }
 ii-bitcoin = { path = "../../coins/bitcoin" }
 ii-fpga-io-am1-s9 = { path = "../../hw/zynq-io-am1-s9/fpga-io" }

@@ -54,7 +54,7 @@ use std::sync::Mutex as StdMutex;
 use std::sync::{Arc, Weak};
 use std::time;
 
-use ii_async_compat::FutureExt;
+use ii_async_utils::FutureExt;
 use ii_stratum::v2::messages::{
     NewMiningJob, OpenStandardMiningChannel, OpenStandardMiningChannelError,
     OpenStandardMiningChannelSuccess, Reconnect, SetNewPrevHash, SetTarget, SetupConnection,

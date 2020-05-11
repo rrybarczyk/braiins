@@ -10,7 +10,7 @@ bosminer = { path = "../bosminer" }
 bosminer-antminer = { path = "../bosminer-antminer" }
 bosminer-config = { path = "../bosminer-config" }
 bosminer-macros = { path = "../bosminer-macros" }
-ii-async-compat = { path = "../../utils-rs/async-compat" }
+ii-async-utils = { path = "../../utils-rs/async-utils" }
 ii-async-i2c = { path = "../../utils-rs/async-i2c" }
 ii-linux-async-i2c = { path = "../../utils-rs/linux-async-i2c" }
 ii-bitcoin = { path = "../../coins/bitcoin" }

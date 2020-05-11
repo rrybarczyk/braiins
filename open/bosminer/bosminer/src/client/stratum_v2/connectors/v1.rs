@@ -27,7 +27,7 @@ use tokio::net::TcpStream;
 
 use futures::prelude::*;
 use futures::select;
-use ii_async_compat::FutureExt;
+use ii_async_utils::FutureExt;
 use ii_logging::macros::*;
 use ii_stratum::{v1, v2};
 use ii_stratum_proxy::translation::{V2ToV1Translation, V2ToV1TranslationOptions};

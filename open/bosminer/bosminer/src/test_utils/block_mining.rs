@@ -303,7 +303,7 @@ async fn collect_solutions(
 pub async fn run<T: hal::Backend>(mut backend_config: T::Config) {
     // this is a small miner core: we generate work, collect solutions, and we pair them together
     // we expect all (generated) problems to be solved
-    // ii_async_compat::run_main_exits(async move {
+
     // read config
     let midstate_count = backend_config.midstate_count();
 

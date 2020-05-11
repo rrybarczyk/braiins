@@ -71,7 +71,7 @@ async fn main() {
             Ok(v) => v,
         });
 
-    ii_async_compat::setup_panic_handling();
+    ii_async_utils::setup_panic_handling();
     bosminer::main::<bosminer_erupter::Backend>(backend_config, bosminer::SIGNATURE.to_string())
         .await;
 }

@@ -6,7 +6,6 @@ license = "GPL-3.0-or-later"
 edition = "2018"
 
 [dependencies]
-ii-async-compat = { path = "../../utils-rs/async-compat" }
 ii-logging = { path = "../../utils-rs/logging" }
 ii-wire = { path = "../../protocols/wire" }
 futures = "0.3.5"

@@ -43,7 +43,7 @@ use futures::prelude::*;
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::task;
 
-use ii_async_compat::FutureExt;
+use ii_async_utils::FutureExt;
 
 /// Token sent by halted task to confirm that halting is done
 struct Done;

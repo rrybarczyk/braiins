@@ -245,7 +245,7 @@ async fn main() {
         return;
     }
 
-    ii_async_compat::setup_panic_handling();
+    ii_async_utils::setup_panic_handling();
     bosminer::main::<bosminer_am1_s9::Backend>(backend_config, bosminer::SIGNATURE.to_string())
         .await;
 }
