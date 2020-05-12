@@ -29,6 +29,7 @@ import asyncssh
 import asyncio
 import json
 import sys
+import warnings
 
 from asyncssh import create_connection
 from asyncssh.misc import async_context_manager
@@ -363,7 +364,7 @@ async def asyncssh_run(conn, *args, cat=True):
     return result.stdout.strip() if cat else result
 
 
-async def detect_device(args, hostname):
+async def detect_device(args, hostname, verbose):
     if not await detect_ssh(hostname):
         return
 
@@ -376,17 +377,18 @@ async def detect_device(args, hostname):
                     print(device_info.get_short())
                     break
     except Exception as exc:
-        print('Connection failed: {}'.format(exc))
+        if verbose:
+            print('Connection to {} failed: {}'.format(hostname, exc))
         return
 
 
-async def detect_devices(args, hostnames):
+async def detect_devices(args, hostnames, verbose):
     for hostname in hostnames:
-        await detect_device(args, str(hostname))
+        await detect_device(args, str(hostname), verbose)
 
 
 async def discover(args, hostnames):
-    tasks = [detect_devices(args, hostnames) for _ in range(args.jobs)]
+    tasks = [detect_devices(args, hostnames, args.verbose) for _ in range(args.jobs)]
     await asyncio.wait(tasks)
 
 
@@ -470,6 +472,8 @@ def build_arg_parser(parser):
                            help='path to file with list of possible passwords for connection')
     subparser.add_argument('-j', '--jobs', type=int, default=50,
                            help='number of concurrent jobs to scan network')
+    subparser.add_argument('-v', '--verbose', action='store_true',
+                           help='Report networking errors')
 
     # create the parser for the "listen" command
     subparser = subparsers.add_parser('listen',
@@ -481,6 +485,8 @@ def build_arg_parser(parser):
                                 "the tags '{IP}' and '{MAC}' will be replaced with actual data")
 
 def main(args):
+    # rid of obnoxisou deperaction warnings
+    warnings.filterwarnings('ignore', module='asyncssh')
     # set arguments
     # call sub-command
     args.func(args)

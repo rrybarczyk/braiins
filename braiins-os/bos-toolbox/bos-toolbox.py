@@ -61,6 +61,8 @@ if __name__ == '__main__':
     # rid of useless warning from paramiko
     warnings.filterwarnings('ignore', category=UserWarning, module='paramiko')
     warnings.filterwarnings('ignore', category=DeprecationWarning, module='paramiko')
+    # silence cryptography deprecation warning from asyncssh in discover
+    warnings.filterwarnings('ignore', module='asyncssh')
 
     # execute only if run as a script
     parser = argparse.ArgumentParser(
