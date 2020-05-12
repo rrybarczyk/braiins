@@ -94,7 +94,8 @@ def update_one(host, password):
             raise UpdateFail(error_msg)
 
 
-class UpdateFail(RuntimeError): pass
+class UpdateFail(RuntimeError):
+    pass
 
 
 def build_arg_parser(parser):
@@ -104,8 +105,10 @@ def build_arg_parser(parser):
 
     parser_sources = parser.add_mutually_exclusive_group(required=True)
     parser_sources.add_argument(
-        'hostname', nargs='?', help='hostname of Braiins OS mining machine for '
-                                    'installing latest firmware version'
+        'hostname',
+        nargs='?',
+        help='hostname of Braiins OS mining machine for '
+        'installing latest firmware version',
     )
     parser_sources.add_argument(
         '--batch', help='path to file with list of hosts to install to'
