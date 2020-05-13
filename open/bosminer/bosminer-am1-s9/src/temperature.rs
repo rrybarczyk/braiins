@@ -30,10 +30,17 @@ use crate::sensor::SensorResult;
 use std::fmt;
 
 /// Helper structure for sending temperatures to Monitor
+/// The structure represents temperature off all sensors on hashboard and has the capability to
+/// produce "summary" temperatures, as well as to tell local and remote temperature in more
+/// readable way
 #[derive(Debug, Clone)]
 pub struct Hashboard(pub(crate) SensorResult);
 
 impl Hashboard {
+    /// When remote (chip) temperature cannot be measured e.g. due to bad solder join or other
+    /// hardware problem. It can be estimated as a fixed offset of 15 °C
+    const REMOTE_TEMPERATURE_OFFSET_ESTIMATE: f32 = 15.0;
+
     fn measurement(&self) -> Option<&ii_hwmon::Reading> {
         match self.0 {
             SensorResult::Valid(ref m) => Some(m),
@@ -65,6 +72,9 @@ impl fmt::Display for Hashboard {
     }
 }
 
+/// Summary temperature is produced as the maximum of PCB (local) and chip temperature (remote).
+/// There is a special workaround to estimate chip temperature when it is not available due to
+/// hardware problems or other problems
 impl monitor::SummaryTemperature for Hashboard {
     fn summary_temperature(&self) -> monitor::Temperature {
         match &self.0 {
@@ -77,7 +87,9 @@ impl monitor::SummaryTemperature for Hashboard {
                 _ => {
                     // fake chip temperature from local (PCB) temperature
                     match temp.local {
-                        Value::Ok(t_local) => monitor::Temperature::Ok(t_local + 15.0),
+                        Value::Ok(t_local) => monitor::Temperature::Ok(
+                            t_local + Self::REMOTE_TEMPERATURE_OFFSET_ESTIMATE,
+                        ),
                         _ => monitor::Temperature::Unknown,
                     }
                 }
