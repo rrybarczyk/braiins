@@ -81,7 +81,7 @@ where
     }
 }
 
-// compute distance between two usizes
+/// Compute distance between two usizes
 pub fn distance(x: usize, y: usize) -> usize {
     if x >= y {
         x - y
@@ -90,6 +90,8 @@ pub fn distance(x: usize, y: usize) -> usize {
     }
 }
 
+/// Agreggate values in Options using a specified function. If any of the Option's is None it
+/// returns the other Option.
 pub fn aggregate<T: Copy, F>(f: F, a: Option<T>, b: Option<T>) -> Option<T>
 where
     F: FnOnce(T, T) -> T,
