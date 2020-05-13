@@ -54,7 +54,8 @@ endef
 define Package/bos_logger/preinst
 #!/bin/sh
 
-echo "*/1 * * * * /usr/sbin/logrotate /etc/logrotate.conf" >> $${IPKG_INSTROOT}/etc/crontabs/root
+echo "*/1 * * * * /usr/sbin/logrotate /etc/logrotate.conf 2>&1 | logger -t logrotate" \
+>> $${IPKG_INSTROOT}/etc/crontabs/root
 endef
 
 define Package/bos_logger/postrm
