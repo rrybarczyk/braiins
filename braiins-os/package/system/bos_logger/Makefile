@@ -48,7 +48,7 @@ define Package/bos_logger/install
 	$(INSTALL_BIN) ./files/bos_logger.init $(1)/etc/init.d/bos_logger
 
 	$(INSTALL_DIR) $(1)/etc/logrotate.d/
-	$(CP) ./files/system.config $(1)/etc/logrotate.d/system
+	$(INSTALL_DATA) ./files/system.config $(1)/etc/logrotate.d/system
 endef
 
 define Package/bos_logger/preinst
