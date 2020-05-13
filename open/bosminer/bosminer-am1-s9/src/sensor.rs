@@ -34,15 +34,6 @@ use crate::error;
 
 use crate::utils;
 
-/// Number of attempts to try read temperature again if it doesn't look right
-const MAX_TEMP_REREAD_ATTEMPTS: usize = 3;
-
-/// Temperature difference that is considerd to be a "sudden temperature change"
-const MAX_SUDDEN_TEMPERATURE_JUMP: f32 = 12.0;
-
-/// Maximum number of errors before temperature sensor is disabled
-const MAX_SENSOR_ERRORS: usize = 10;
-
 #[derive(Debug, Clone)]
 pub enum SensorResult {
     NotInitialized,
@@ -61,6 +52,18 @@ pub struct Sensor {
 }
 
 impl Sensor {
+    /// Number of attempts to try read temperature again if it doesn't look right
+    const MAX_TEMP_REREAD_ATTEMPTS: usize = 3;
+
+    /// Temperature difference that is considerd to be a "sudden temperature change"
+    const MAX_SUDDEN_TEMPERATURE_JUMP: f32 = 12.0;
+
+    /// Maximum number of errors before temperature sensor is disabled
+    const MAX_SENSOR_ERRORS: usize = 10;
+
+    /// Delay before repeating the read operation in case of sensor reading error
+    const REPEATED_READ_DELAY: Duration = Duration::from_millis(200);
+
     pub fn new(name: String, hw: Box<dyn ii_hwmon::TempSensor>) -> Self {
         Self {
             hw,
@@ -75,7 +78,7 @@ impl Sensor {
         self.error_average += 1.0;
 
         // If there's too many errors, just disable this sensor
-        if self.error_average >= MAX_SENSOR_ERRORS as f32 {
+        if self.error_average >= Self::MAX_SENSOR_ERRORS as f32 {
             error!(
                 "Sensor {}: Too many sensor errors, disabling sensor",
                 self.name
@@ -90,13 +93,16 @@ impl Sensor {
         self.error_average *= 0.9995;
     }
 
+    /// Read temperature and implement special error handling that aggregates errors from the
+    /// sensors. The point is to mark sensor as broken if it doesn't work properly in a long run
+    /// see `add_error` + `decay_error`.
     pub async fn read(&mut self) -> SensorResult {
         if self.is_broken {
             return SensorResult::Broken;
         }
         self.decay_error();
 
-        let mut attempts_left = MAX_TEMP_REREAD_ATTEMPTS;
+        let mut attempts_left = Self::MAX_TEMP_REREAD_ATTEMPTS;
         loop {
             // Read temperature sensor
             match self.hw.read().await.map_err(|e| error::Error::from(e)) {
@@ -117,7 +123,7 @@ impl Sensor {
                     if attempts_left > 0 {
                         if let Some(last_max_t) = self.last_max_temp {
                             if let Some(max_t) = max_temp {
-                                if (max_t - last_max_t).abs() >= MAX_SUDDEN_TEMPERATURE_JUMP {
+                                if (max_t - last_max_t).abs() >= Self::MAX_SUDDEN_TEMPERATURE_JUMP {
                                     warn!("Sensor {}: temperature suddenly jumped from {} to {}, retrying", self.name, last_max_t, max_t);
 
                                     self.add_error();
@@ -128,7 +134,7 @@ impl Sensor {
 
                                     // Do not send anything out yet, just wait a bit and then try to read
                                     // the temperature again
-                                    delay_for(Duration::from_millis(200)).await;
+                                    delay_for(Self::REPEATED_READ_DELAY).await;
                                     attempts_left -= 1;
                                     continue;
                                 }
