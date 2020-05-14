@@ -144,10 +144,20 @@ boot()
 		local plus=""
 		case $BOS_VERSION_SUFFIX in *plus*) plus="+";; esac
 
+		local model=""
+		case $BOARD_NAME in
+			am1-s9)
+				model="Antminer S9"
+				;;
+			am2-s15)
+				model="Antminer S15"
+				;;
+		esac
+
 		cat > "$CONF" <<-END
 			[format]
 			version = '1.0${plus}'
-			model = 'Antminer S9'
+			model = '${model}'
 			generator = 'init_script'
 			timestamp = $(date +%s)
 		END

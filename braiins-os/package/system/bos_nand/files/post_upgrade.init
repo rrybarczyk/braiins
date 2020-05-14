@@ -24,12 +24,13 @@
 
 START=46
 start() {
-	. /lib/zynq.sh
-	case $(zynq_board_name) in
+	. /lib/functions/bos-defaults.sh
+	case $BOARD_NAME in
 		dm1-g9|\
 		dm1-g19|\
 		dm1-g29|\
-		am1-s9)
+		am1-s9|\
+		am2-s15)
 			# update environment when it is not corrupted
 			test -z "$(fw_printenv 2>&1 >/dev/null)" && update_env
 			;;

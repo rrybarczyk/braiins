@@ -129,15 +129,20 @@ class Builder:
     UPGRADE_AM1 = 'am1'
     UPGRADE_AM1_SSH = (UPGRADE_AM1, UPGRADE_SSH)
     UPGRADE_AM1_WEB = (UPGRADE_AM1, 'web')
+    UPGRADE_AM2 = 'am2'
+    UPGRADE_AM2_SSH = (UPGRADE_AM2, UPGRADE_SSH)
     UPGRADE_VERSION = {
-        'zynq-dm1': (
+        'zynq-dm1': [
             (UPGRADE_DM1_SSH, (ARCHIVE_TGZ, [])),
             (UPGRADE_DM1_TELNET, (ARCHIVE_TGZ, []))
-        ),
-        'zynq-am1': (
+        ],
+        'zynq-am1': [
             (UPGRADE_AM1_SSH, (ARCHIVE_TGZ, [])),
             (UPGRADE_AM1_WEB, (ARCHIVE_TGZ, [ARCHIVE_FLAG_FLAT]))
-        )
+        ],
+        'zynq-am2': [
+            (UPGRADE_AM2_SSH, (ARCHIVE_TGZ, []))
+        ]
     }
 
     UPGRADE_DIR = 'upgrade'
@@ -1800,7 +1805,8 @@ class Builder:
             'zynq-dm1-g9': 'G9',
             'zynq-dm1-g19': 'G19',
             'zynq-dm1-g29': 'G29',
-            'zynq-am1-s9': 'S9'
+            'zynq-am1-s9': 'S9',
+            'zynq-am2-s15': 'S15'
         }.get(self._config.bos.platform)
         info.write('FW_MINER_HWVER="{}"\n\n'.format(hwver).encode())
 
