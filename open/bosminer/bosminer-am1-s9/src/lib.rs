@@ -239,7 +239,7 @@ impl RunningChain {
     }
 
     /// TODO: for the love of god use macros or something
-    pub async fn get_flash_checksum(&self) -> u32 {
+    pub async fn get_flash_checksum(&self) -> power::HashboardFlashChecksum {
         let inner = self.manager.inner.lock().await;
         let flash = inner
             .hash_chain

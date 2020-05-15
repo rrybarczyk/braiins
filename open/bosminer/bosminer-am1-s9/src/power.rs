@@ -32,6 +32,7 @@ use std::time::Duration;
 
 use crate::error::{self, ErrorKind};
 use crate::halt;
+use bitcoin_hashes::{sha256, Hash};
 use ii_linux_async_i2c::AsyncI2cDev;
 
 use futures::lock::Mutex;
@@ -431,10 +432,12 @@ impl FlashFreq {
     }
 }
 
+pub type HashboardFlashChecksum = [u8; 32];
+
 pub struct HashboardFlash {
     pub badcore_flash: Option<FlashBadcore>,
     pub freq_flash: Option<FlashFreq>,
-    pub checksum: u32,
+    pub checksum: HashboardFlashChecksum,
 }
 
 /// Represents a voltage controller for a particular hashboard
@@ -716,10 +719,11 @@ impl Control {
             .await?;
         let freq_flash_data = self.read_flash(FlashFreq::START, FlashFreq::LEN).await?;
 
+        let checksum =
+            sha256::Hash::hash(&([&badcore_flash_data[..], &freq_flash_data[..]].concat()))
+                .into_inner();
         *self.flash.lock().await = Some(HashboardFlash {
-            checksum: crc::crc32::checksum_ieee(
-                &([&badcore_flash_data[..], &freq_flash_data[..]].concat()),
-            ),
+            checksum,
             badcore_flash: FlashBadcore::parse(&badcore_flash_data),
             freq_flash: FlashFreq::parse(&freq_flash_data),
         });
