@@ -33,7 +33,6 @@ define Package/bos_tools
   SECTION:=utils
   CATEGORY:=Utilities
   TITLE:=Utilities for managing braiins OS
-  DEPENDS:=+socat
 endef
 
 define Package/bos_tools/description
@@ -55,6 +54,7 @@ define Package/bos_tools/install
 	$(INSTALL_CONF) ./files/bos.config $(1)/etc/config/bos
 	$(INSTALL_DIR) $(1)/usr/sbin
 	$(INSTALL_BIN) ./files/bos $(1)/usr/sbin/
+	$(INSTALL_BIN) ./files/ip-report.lua $(1)/usr/sbin/ip-report
 	$(INSTALL_BIN) ./files/run-background-process $(1)/usr/sbin/
 endef
 

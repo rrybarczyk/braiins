@@ -106,19 +106,7 @@ ip_report() {
 		echo "command 'ip_report' does not take any argument" >&2
 		exit 1
 	fi
-	# check if it is enabled in configuration
-	[ $(uci get bos.ip_report.enable) == '1' ] || return 0
-	# get message and socat configuration
-	local format=$(uci get bos.ip_report.format)
-	local socat_arg=$(uci get bos.ip_report.socat)
-	# format and send message with socat utility
-	local ip_addr=$(ip route get 1 | awk '{print $NF;exit}')
-	local mac_addr=$(cat /sys/class/net/eth0/address)
-	local hostname=$(uname -n)
-	format="${format//\${IP\}/$ip_addr}"
-	format="${format//\${MAC\}/$mac_addr}"
-	format="${format//\${HOSTNAME\}/$hostname}"
-	echo -n "$format" | socat - "$socat_arg"
+	/usr/sbin/ip-report
 }
 
 #nightly_feeds_status() {
