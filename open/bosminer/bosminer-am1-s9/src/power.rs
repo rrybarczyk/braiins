@@ -152,6 +152,7 @@ impl Voltage {
     }
 }
 
+/// Build voltage from a u32 millivolts
 impl TryFrom<u32> for Voltage {
     type Error = error::Error;
 
@@ -160,6 +161,7 @@ impl TryFrom<u32> for Voltage {
     }
 }
 
+/// Convert `Voltage` to u32 millivolts
 impl From<Voltage> for u32 {
     fn from(v: Voltage) -> u32 {
         (v.as_volts() * 1000.0).round() as u32
