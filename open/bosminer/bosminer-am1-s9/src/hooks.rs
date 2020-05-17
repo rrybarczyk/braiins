@@ -47,7 +47,7 @@ pub trait Hooks: Send + Sync + Debug {
     }
 
     /// Called when `Monitor` has been started
-    async fn monitor_started(&self, _monitor: Arc<monitor::Monitor>) {}
+    async fn monitor_started(self: Arc<Self>, _monitor: Arc<monitor::Monitor>) {}
 
     /// Called when init process is about to start hash chain via `Manager`.
     /// Called for each hashchain.

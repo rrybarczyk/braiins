@@ -645,7 +645,7 @@ impl Backend {
             app_halt_receiver.clone(),
         )
         .await;
-        hooks.monitor_started(monitor.clone()).await;
+        hooks.clone().monitor_started(monitor.clone()).await;
 
         let voltage_ctrl_backend = Arc::new(power::I2cBackend::new(0));
         let mut managers = Vec::new();
