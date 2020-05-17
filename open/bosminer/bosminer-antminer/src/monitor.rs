@@ -252,10 +252,20 @@ pub struct Config {
     pub fans_on_while_warming_up: bool,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum TemperatureStatus {
+    Dangerous,
+    Hot,
+    Normal,
+    /// TODO: Implement config option that decides what `Cold` is
+    Cold,
+}
+
 #[derive(Debug, Clone)]
 pub struct ControlDecisionExplained {
     pub decision: ControlDecision,
     pub reason: String,
+    pub temperature_status: Option<TemperatureStatus>,
 }
 
 /// Output of the decision process
@@ -282,6 +292,7 @@ impl ControlDecision {
             return ControlDecisionExplained {
                 decision: Self::UseFixedSpeed(fan::Speed::FULL_SPEED),
                 reason: "Fans full speed: unknown temperature".into(),
+                temperature_status: None,
             };
         }
         match &fan_config.mode {
@@ -289,6 +300,7 @@ impl ControlDecision {
                 return ControlDecisionExplained {
                     decision: Self::UseFixedSpeed(*pwm),
                     reason: format!("User defined fan {}", *pwm),
+                    temperature_status: Some(TemperatureStatus::Normal),
                 };
             }
             FanControlMode::TargetTemperature(target_temp) => match temp {
@@ -299,6 +311,7 @@ impl ControlDecision {
                     if input_temp >= temp_config.hot_temp {
                         return ControlDecisionExplained {
                             decision: Self::UseFixedSpeed(fan::Speed::FULL_SPEED),
+                            temperature_status: Some(TemperatureStatus::Hot),
                             reason: format!("Fans full speed: temperature {} above HOT", temp),
                         };
                     }
@@ -307,6 +320,7 @@ impl ControlDecision {
                             target_temp: *target_temp,
                             input_temp,
                         },
+                        temperature_status: Some(TemperatureStatus::Normal),
                         reason: format!(
                             "Automatic fan control: input {} target {:.0}°C",
                             temp, target_temp
@@ -324,6 +338,7 @@ impl ControlDecision {
                 return ControlDecisionExplained {
                     decision: Self::UseFixedSpeed(pwm),
                     reason: format!("Fans to {} (user defined)", pwm),
+                    temperature_status: None,
                 };
             }
             FanControlMode::TargetTemperature(_) => {
@@ -332,6 +347,7 @@ impl ControlDecision {
                 return ControlDecisionExplained {
                     decision: Self::UseFixedSpeed(fan::Speed::FULL_SPEED),
                     reason: "wrong configuration - temp control off".into(),
+                    temperature_status: None,
                 };
             }
         }
@@ -353,6 +369,7 @@ impl ControlDecision {
                         return ControlDecisionExplained {
                             decision: Self::Shutdown,
                             reason: format!("Shutdown: temperature {} above DANGEROUS", temp),
+                            temperature_status: Some(TemperatureStatus::Dangerous),
                         };
                     }
                 }
@@ -378,6 +395,7 @@ impl ControlDecision {
                 if num_fans_running < fan_config.min_fans {
                     return ControlDecisionExplained {
                         decision: Self::Shutdown,
+                        temperature_status: None,
                         reason: format!(
                             "Shutdown: not enough fans ({} < {})",
                             num_fans_running, fan_config.min_fans
@@ -391,6 +409,7 @@ impl ControlDecision {
             ControlDecisionExplained {
                 decision: Self::Nothing,
                 reason: "control disabled".into(),
+                temperature_status: None,
             }
         }
     }
