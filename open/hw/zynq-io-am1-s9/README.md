@@ -17,6 +17,7 @@ There are two designs that differs in used FPGA (xc7z010 or xc7z007s) in control
 
 FPGA design contains following IP cores:
 - axi_gpio - standard Xilinx GPIO module (2x)
+- axi_iic - standard Xilinx I2C module (1x)
 - axi_fan_ctrl - custom IP core for PWM generation and fan speed monitoring (1x)
 - axi_bm13xx - custom IP core for communication with hashing chips BM1387, BM1391, BM1393 and BM1397 (3x)
 
@@ -24,13 +25,13 @@ FPGA design contains following IP cores:
 | ------------------ | ------------------------------- | :----------: | :----: | :-------------: | :-------------: |
 | axi_gpio_input     | Xilinx AXI GPIO v2.0            | 0x41200000   | 64kB   | false           | 50              |
 | axi_gpio_output    | Xilinx AXI GPIO v2.0            | 0x41210000   | 64kB   | false           | 50              |
+| axi_iic_hb         | Xilinx AXI I2C v2.0             | 0x41600000   | 64kB   | true (61)       | 50              |
 | axi_fan_ctrl       | Braiins AXI Fan Controller v1.0 | 0x42800000   | 64kB   | false           | 50              |
 | axi_bm13xx_0       | Braiins AXI BM13xx v1.0         | 0x43C00000   | 64kB   | true (62..64)   | 50              |
 | axi_bm13xx_1       | Braiins AXI BM13xx v1.0         | 0x43C10000   | 64kB   | true (65..67)   | 50              |
 | axi_bm13xx_2       | Braiins AXI BM13xx v1.0         | 0x43C20000   | 64kB   | true (68,84,85) | 50              |
 
 UART interfaces of AXI BM13xx IP cores are connected to connectors J6..J8.
-I2C interface for hashboard's power controllers is connected to ARM PS IIC_0 controller at address 0xE0004000.
 
 The design is dedicated for S9 miners with C41 control board.
 
