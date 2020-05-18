@@ -74,7 +74,7 @@ Control boards have almost the same FPGA pinouts, the difference is only in J4 c
 (pins J4.RxD and J4.Txd are shared with FAN3.SENSE and FAN4.SENSE). The design contains a multiplexer to
 switch these pins - switching is based on state of `axi_bm13xx_3` IP core. When the IP core is enabled by
 register CTRL_REG.ENABLE then pins are represented as UART and connected into the IP core. Otherwise
-pins are represented as fan sense inputs and are connected into axi_fan_ctrl IP core.
+pins are represented as fan sense inputs and are connected into `axi_fan_ctrl` IP core.
 
 
 # AXI BM13xx IP Core Description
