@@ -31,21 +31,13 @@ use futures::executor::block_on;
 use futures::stream::StreamExt;
 use tokio::task;
 
-/// For devmem
-use nix::sys::mman::{MapFlags, ProtFlags};
-use std::fs::OpenOptions;
-use std::os::unix::prelude::AsRawFd;
-
-use std::thread;
-use std::time::Duration;
-
 use embedded_hal::blocking::i2c::{Read, Write};
 use linux_embedded_hal::I2cdev;
 
-use thiserror::Error;
+use std::convert::AsRef;
+use std::path::Path;
 
-/// Delay constant for I2C controller
-const I2C_CONTROLLER_RESET_DELAY: Duration = Duration::from_millis(850);
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -57,37 +49,6 @@ pub enum Error {
 }
 
 pub type Result<T> = std::result::Result<T, self::Error>;
-
-/// Utility function to get raw access to registers of I2C controller
-fn devmem_write_u32(address: usize, value: u32) {
-    let f = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open("/dev/mem")
-        .expect("BUG: cannot open /dev/mem");
-
-    let page_size = 4096;
-    let raw_ptr = unsafe {
-        nix::sys::mman::mmap(
-            0 as *mut libc::c_void,
-            page_size,
-            ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-            MapFlags::MAP_SHARED,
-            f.as_raw_fd(),
-            (address & !(page_size - 1)) as libc::off_t,
-        )
-        .expect("BUG: failed to mmap /dev/mem")
-    };
-    let data_ptr = (raw_ptr as usize + (address & (page_size - 1))) as *mut libc::c_void;
-    let data_ptr = unsafe { &mut *(data_ptr as *mut u32) };
-    *data_ptr = value;
-    unsafe { nix::sys::mman::munmap(raw_ptr, page_size) }.expect("BUG: munmap failed");
-}
-
-/// Reset I2C controller #0
-fn i2c_reset(reset_enable: bool) {
-    devmem_write_u32(0xF8000224, if reset_enable { 1 } else { 0 });
-}
 
 enum Request {
     Read {
@@ -102,16 +63,12 @@ enum Request {
         /// Channel used to send back result
         reply: oneshot::Sender<Result<()>>,
     },
-    ResetI2cController {
-        reply: oneshot::Sender<Result<()>>,
-    },
 }
 
 /// Server for I2C read/write requests
 /// Runs in separate thread.
 /// Terminates when all request sender sides are dropped.
 fn serve_requests(
-    path: String,
     mut i2c_device: I2cdev,
     mut request_rx: mpsc::UnboundedReceiver<Request>,
 ) -> Result<()> {
@@ -141,26 +98,8 @@ fn serve_requests(
                     warn!("AsyncI2c reply send failed - remote side may have ended");
                 }
             }
-            Request::ResetI2cController { reply } => {
-                // Close I2C device
-                drop(i2c_device);
-
-                // Reset the controller
-                i2c_reset(true);
-                thread::sleep(I2C_CONTROLLER_RESET_DELAY);
-                i2c_reset(false);
-                thread::sleep(I2C_CONTROLLER_RESET_DELAY);
-
-                // Open the device again (kernel will re-initialize the registers)
-                i2c_device = I2cdev::new(&path).expect("BUG: failed to re-open i2c device");
-
-                if reply.send(Ok(())).is_err() {
-                    warn!("AsyncI2c reply send failed - remote side may have ended");
-                }
-            }
         }
     }
-    info!("I2C device exiting");
     Ok(())
 }
 
@@ -177,18 +116,14 @@ impl AsyncI2cDev {
     /// Open I2C device
     /// Although this function is not async, it has to be called from within Tokio context
     /// because it spawns task in a separate thread that serves the (blocking) I2C requests.
-    pub fn open(path: String, clear_reset: bool) -> Result<Self> {
-        if clear_reset {
-            info!("Clearing reset on I2C controller...");
-            i2c_reset(false);
-        }
-        let i2c_device = I2cdev::new(&path)?;
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let i2c_device = I2cdev::new(path)?;
         let (request_tx, request_rx) = mpsc::unbounded();
 
         // Spawn the future in a separate blocking pool (for blocking operations)
         // so that this doesn't block the regular threadpool.
         task::spawn_blocking(move || {
-            if let Err(e) = serve_requests(path, i2c_device, request_rx) {
+            if let Err(e) = serve_requests(i2c_device, request_rx) {
                 error!("{}", e);
             }
         });
@@ -216,15 +151,6 @@ impl AsyncI2cDev {
             bytes,
             reply: reply_tx,
         };
-        self.request_tx
-            .unbounded_send(request)
-            .expect("BUG: I2C request failed");
-        reply_rx.await.expect("BUG: failed to receive I2C reply")
-    }
-
-    pub async fn reset_i2c_controller(&self) -> Result<()> {
-        let (reply_tx, reply_rx) = oneshot::channel();
-        let request = Request::ResetI2cController { reply: reply_tx };
         self.request_tx
             .unbounded_send(request)
             .expect("BUG: I2C request failed");
