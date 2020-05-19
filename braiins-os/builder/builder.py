@@ -220,6 +220,24 @@ class Builder:
         platform = platform or self._config.bos.platform
         return tuple(platform.split('-', 1))
 
+    def _get_platform_attr(self, config):
+        """
+        Get all attributes for current platform specified by matching pattern in
+        the configuration.
+
+        :param config:
+            Root of configuration where should be platform attribute located.
+        :return:
+            Configuration for sysupgrade attribute for current platform.
+        """
+        if not config:
+            return
+
+        # find attributes for current platform with prefix pattern
+        for pattern, value in sorted(config.items(), reverse=True):
+            if self._config.bos.platform.startswith(pattern):
+                yield value
+
     def _get_sysupgrade_attr(self, name):
         """
         Get sysupgrade attribute for current platform specified by matching pattern in
@@ -233,8 +251,8 @@ class Builder:
         sysupgrade = self._config.build.sysupgrade
 
         # find attributes for current platform with prefix pattern
-        for pattern, value in sorted(sysupgrade.items(), reverse=True):
-            if self._config.bos.platform.startswith(pattern) and value.get(name):
+        for value in self._get_platform_attr(sysupgrade):
+            if value.get(name):
                 return value.get(name)
 
     def _write_target_config(self, stream, config):
@@ -1184,6 +1202,12 @@ class Builder:
         for attribute in bool_attributes:
             if self._config.uenv.get(attribute, 'no') == 'yes':
                 stream.write("{}=yes\n".format(attribute))
+        attributes = self._config.uenv.get('attributes')
+        for attributes in self._get_platform_attr(attributes):
+            for attribute, value in attributes.items():
+                if value.is_list():
+                    value = ' '.join(value)
+                stream.write("{}={}\n".format(attribute, value))
 
     def _mtd_write(self, ssh, image_path: str, device: str, offset: int=0, compress: bool=False, erase: bool=True):
         """

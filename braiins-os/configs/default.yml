@@ -166,6 +166,15 @@ uenv:
   sd_images: no
   # boot Linux from SD instead of NAND
   sd_boot: no
+  # list of custom attributes
+  attributes:
+    zynq-am2:
+      uenvcmd:
+      - echo Loading BOS U-Boot...;
+      - load mmc 0 0x3FFFFC0 u-boot.img &&
+      - dcache flush &&
+      - icache flush &&
+      - go 0x4000000
 
 #upgrade:
 #  # specify previous firmware version used as a base for current version
