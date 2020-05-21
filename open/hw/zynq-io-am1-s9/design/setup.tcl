@@ -51,6 +51,7 @@ set supported_boards [list \
     "S15" \
     "T15" \
     "S17" \
+    "S17+" \
     "T17" \
 ]
 

@@ -1,5 +1,5 @@
 ----------------------------------------------------------------------------------------------------
--- Copyright (C) 2019  Braiins Systems s.r.o.
+-- Copyright (C) 2020  Braiins Systems s.r.o.
 --
 -- This file is part of Braiins Open-Source Initiative (BOSI).
 --
@@ -22,19 +22,21 @@
 -- contact us at opensource@braiins.com.
 ----------------------------------------------------------------------------------------------------
 -- Project Name:   Braiins OS
--- Description:    Top module of Fan Controller IP core
+-- Description:    Top module of Board Controller IP core
 --
 -- Engineer:       Marian Pristach
--- Revision:       1.0.1 (05.05.2020)
+-- Revision:       1.0.0 (05.05.2020)
 -- Comments:
 ----------------------------------------------------------------------------------------------------
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-entity axi_fan_ctrl_v1_0 is
+entity axi_board_ctrl_v1_0 is
     generic (
         -- Users to add parameters here
+
+        C_DEFAULT_BOARD    : integer    := 0;
 
         -- User parameters ends
         -- Do not modify the parameters beyond this line
@@ -47,11 +49,21 @@ entity axi_fan_ctrl_v1_0 is
     port (
         -- Users to add ports here
 
-        -- Fan sense inputs
-        fan_sense        : in  std_logic_vector(3 downto 0);
+        -- FPGA IOs
+        pin_L14         : in    std_logic;    -- J4.Rx (in) or FAN3.SENSE (in, C49)
+        pin_M14         : inout std_logic;    -- J4.Tx (out) or FAN4.SENSE (in, C49)
+        pin_E11         : out   std_logic;    -- FAN[1,2].PWM (out)
+        pin_E12         : inout std_logic;    -- FAN[3,4].PWM (out) or NC
+        pin_F13         : in    std_logic;    -- FAN3.SENSE (in, C52) or NC
+        pin_F14         : in    std_logic;    -- FAN4.SENSE (in, C52) or NC
 
-        -- PWM output
-        fan_pwm          : out std_logic_vector(1 downto 0);
+        -- UART J4 interface
+        uart_rxd        : in  std_logic;
+        uart_txd        : out std_logic;
+
+        -- Fan Controller
+        fan_pwm         : in  std_logic_vector(1 downto 0);
+        fan_sense       : out std_logic_vector(1 downto 0);
 
         -- User ports ends
         -- Do not modify the ports beyond this line
@@ -80,62 +92,37 @@ entity axi_fan_ctrl_v1_0 is
         s_axi_rvalid    : out std_logic;
         s_axi_rready    : in std_logic
     );
-end axi_fan_ctrl_v1_0;
+end axi_board_ctrl_v1_0;
 
-architecture rtl of axi_fan_ctrl_v1_0 is
-
-    -- component declaration
-    component fan_ctrl_S_AXI is
-        generic (
-            C_S_AXI_DATA_WIDTH    : integer    := 32;
-            C_S_AXI_ADDR_WIDTH    : integer    := 5
-        );
-        port (
-            -- Fan sense inputs
-            fan_sense       : in std_logic_vector(3 downto 0);
-
-            -- PWM output
-            fan_pwm         : out std_logic_vector(1 downto 0);
-
-            S_AXI_ACLK      : in std_logic;
-            S_AXI_ARESETN   : in std_logic;
-            S_AXI_AWADDR    : in std_logic_vector(C_S_AXI_ADDR_WIDTH-1 downto 0);
-            S_AXI_AWPROT    : in std_logic_vector(2 downto 0);
-            S_AXI_AWVALID   : in std_logic;
-            S_AXI_AWREADY   : out std_logic;
-            S_AXI_WDATA     : in std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0);
-            S_AXI_WSTRB     : in std_logic_vector((C_S_AXI_DATA_WIDTH/8)-1 downto 0);
-            S_AXI_WVALID    : in std_logic;
-            S_AXI_WREADY    : out std_logic;
-            S_AXI_BRESP     : out std_logic_vector(1 downto 0);
-            S_AXI_BVALID    : out std_logic;
-            S_AXI_BREADY    : in std_logic;
-            S_AXI_ARADDR    : in std_logic_vector(C_S_AXI_ADDR_WIDTH-1 downto 0);
-            S_AXI_ARPROT    : in std_logic_vector(2 downto 0);
-            S_AXI_ARVALID   : in std_logic;
-            S_AXI_ARREADY   : out std_logic;
-            S_AXI_RDATA     : out std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0);
-            S_AXI_RRESP     : out std_logic_vector(1 downto 0);
-            S_AXI_RVALID    : out std_logic;
-            S_AXI_RREADY    : in std_logic
-        );
-    end component fan_ctrl_S_AXI;
+architecture rtl of axi_board_ctrl_v1_0 is
 
 begin
 
     -- Instantiation of Axi Bus Interface S_AXI
-    i_fan_ctrl_S_AXI : fan_ctrl_S_AXI
+    i_board_ctrl_S_AXI : entity work.board_ctrl_S_AXI
         generic map (
+            C_DEFAULT_BOARD    => C_DEFAULT_BOARD,
             C_S_AXI_DATA_WIDTH => C_S_AXI_DATA_WIDTH,
             C_S_AXI_ADDR_WIDTH => C_S_AXI_ADDR_WIDTH
         )
         port map (
-            -- Fan sense inputs
+            -- FPGA IOs
+            pin_L14         => pin_L14,
+            pin_M14         => pin_M14,
+            pin_E11         => pin_E11,
+            pin_E12         => pin_E12,
+            pin_F13         => pin_F13,
+            pin_F14         => pin_F14,
+
+            -- UART J4 interface
+            uart_rxd        => uart_rxd,
+            uart_txd        => uart_txd,
+
+            -- Fan Controller
+            fan_pwm         => fan_pwm,
             fan_sense       => fan_sense,
 
-            -- PWM output
-            fan_pwm         => fan_pwm,
-
+            -- AXI Interface
             S_AXI_ACLK      => s_axi_aclk,
             S_AXI_ARESETN   => s_axi_aresetn,
             S_AXI_AWADDR    => s_axi_awaddr,

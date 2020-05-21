@@ -1,5 +1,5 @@
 ----------------------------------------------------------------------------------------------------
--- Copyright (C) 2019  Braiins Systems s.r.o.
+-- Copyright (C) 2020  Braiins Systems s.r.o.
 --
 -- This file is part of Braiins Open-Source Initiative (BOSI).
 --
@@ -22,19 +22,21 @@
 -- contact us at opensource@braiins.com.
 ----------------------------------------------------------------------------------------------------
 -- Project Name:   Braiins OS
--- Description:    AXI Interface of Fan Controller IP core
+-- Description:    AXI Interface of Board Controller IP core
 --
 -- Engineer:       Marian Pristach
--- Revision:       1.0.1 (05.05.2020)
+-- Revision:       1.0.0 (05.05.2020)
 -- Comments:
 ----------------------------------------------------------------------------------------------------
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-entity fan_ctrl_S_AXI is
+entity board_ctrl_S_AXI is
     generic (
         -- Users to add parameters here
+
+        C_DEFAULT_BOARD       : integer    := 0;
 
         -- User parameters ends
         -- Do not modify the parameters beyond this line
@@ -47,11 +49,21 @@ entity fan_ctrl_S_AXI is
     port (
         -- Users to add ports here
 
-        -- Fan sense inputs
-        fan_sense       : in std_logic_vector(3 downto 0);
+        -- FPGA IOs
+        pin_L14         : in    std_logic;
+        pin_M14         : inout std_logic;
+        pin_E11         : out   std_logic;
+        pin_E12         : inout std_logic;
+        pin_F13         : in    std_logic;
+        pin_F14         : in    std_logic;
 
-        -- PWM output
-        fan_pwm         : out std_logic_vector(1 downto 0);
+        -- UART J4 interface
+        uart_rxd        : in  std_logic;
+        uart_txd        : out std_logic;
+
+        -- Fan Controller
+        fan_pwm         : in  std_logic_vector(1 downto 0);
+        fan_sense       : out std_logic_vector(1 downto 0);
 
         -- User ports ends
         -- Do not modify the ports beyond this line
@@ -117,9 +129,9 @@ entity fan_ctrl_S_AXI is
             -- accept the read data and response information.
         S_AXI_RREADY    : in std_logic
     );
-end fan_ctrl_S_AXI;
+end board_ctrl_S_AXI;
 
-architecture rtl of fan_ctrl_S_AXI is
+architecture rtl of board_ctrl_S_AXI is
 
     -- AXI4LITE signals
     signal axi_awaddr    : std_logic_vector(C_S_AXI_ADDR_WIDTH-1 downto 0);
@@ -144,25 +156,17 @@ architecture rtl of fan_ctrl_S_AXI is
     ---- Signals for user logic register space example
     --------------------------------------------------
     ---- Number of Slave Registers 8
-    signal slv_fan1_rps   : std_logic_vector(7 downto 0);
-    signal slv_fan2_rps   : std_logic_vector(7 downto 0);
-    signal slv_fan3_rps   : std_logic_vector(7 downto 0);
-    signal slv_fan4_rps   : std_logic_vector(7 downto 0);
-    signal slv_pwm_value1 : std_logic_vector(6 downto 0);
-    signal slv_pwm_value2 : std_logic_vector(6 downto 0);
-    signal slv_reg_rden   : std_logic;
-    signal slv_reg_wren   : std_logic;
-    signal reg_data_out   : std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0);
-    signal byte_index     : integer;
-    signal aw_en          : std_logic;
+    signal slv_stat_reg  : std_logic_vector(0 downto 0);
+    signal slv_ctrl_reg  : std_logic_vector(5 downto 0);
+    signal slv_reg_rden  : std_logic;
+    signal slv_reg_wren  : std_logic;
+    signal reg_data_out  : std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0);
+    signal byte_index    : integer;
+    signal aw_en         : std_logic;
 
     -- Register mapping
-    constant FAN1_RPS_REG : std_logic_vector(OPT_MEM_ADDR_BITS downto 0) := "000";  -- Fan 1 RPS, read only
-    constant FAN2_RPS_REG : std_logic_vector(OPT_MEM_ADDR_BITS downto 0) := "001";  -- Fan 2 RPS, read only
-    constant FAN3_RPS_REG : std_logic_vector(OPT_MEM_ADDR_BITS downto 0) := "010";  -- Fan 3 RPS, read only
-    constant FAN4_RPS_REG : std_logic_vector(OPT_MEM_ADDR_BITS downto 0) := "011";  -- Fan 4 RPS, read only
-    constant FAN1_PWM_REG : std_logic_vector(OPT_MEM_ADDR_BITS downto 0) := "100";  -- Fan PWM duty cycle value, read-write
-    constant FAN2_PWM_REG : std_logic_vector(OPT_MEM_ADDR_BITS downto 0) := "101";  -- Fan PWM duty cycle value, read-write
+    constant STAT_REG     : std_logic_vector(OPT_MEM_ADDR_BITS downto 0) := "000";  -- Status register, read only
+    constant CTRL_REG     : std_logic_vector(OPT_MEM_ADDR_BITS downto 0) := "001";  -- Control register, read-write
 
 begin
     -- I/O Connections assignments
@@ -193,9 +197,9 @@ begin
                     -- on the write address and data bus. This design
                     -- expects no outstanding transactions.
                     axi_awready <= '1';
-                    elsif (S_AXI_BREADY = '1' and axi_bvalid = '1') then
-                        aw_en <= '1';
-                        axi_awready <= '0';
+                elsif (S_AXI_BREADY = '1' and axi_bvalid = '1') then
+                    aw_en <= '1';
+                    axi_awready <= '0';
                 else
                     axi_awready <= '0';
                 end if;
@@ -257,31 +261,25 @@ begin
     process (S_AXI_ACLK)
         variable loc_addr :std_logic_vector(OPT_MEM_ADDR_BITS downto 0);
     begin
-      if rising_edge(S_AXI_ACLK) then
-        if S_AXI_ARESETN = '0' then
-          slv_pwm_value1 <= (others => '0');
-          slv_pwm_value2 <= (others => '0');
-        else
-          loc_addr := axi_awaddr(ADDR_LSB + OPT_MEM_ADDR_BITS downto ADDR_LSB);
-          if (slv_reg_wren = '1') then
-            case loc_addr is
-              when FAN1_PWM_REG =>
-                  if ( S_AXI_WSTRB(0) = '1' ) then
-                    -- Respective byte enables are asserted as per write strobes
-                    slv_pwm_value1 <= S_AXI_WDATA(slv_pwm_value1'range);
-                  end if;
-              when FAN2_PWM_REG =>
-                  if ( S_AXI_WSTRB(0) = '1' ) then
-                    -- Respective byte enables are asserted as per write strobes
-                    slv_pwm_value2 <= S_AXI_WDATA(slv_pwm_value2'range);
-                  end if;
-              when others =>
-                slv_pwm_value1 <= slv_pwm_value1;
-                slv_pwm_value2 <= slv_pwm_value2;
-            end case;
-          end if;
+        if rising_edge(S_AXI_ACLK) then
+            if S_AXI_ARESETN = '0' then
+                slv_ctrl_reg <= std_logic_vector(to_unsigned(C_DEFAULT_BOARD, slv_ctrl_reg'length));
+            else
+                loc_addr := axi_awaddr(ADDR_LSB + OPT_MEM_ADDR_BITS downto ADDR_LSB);
+                if (slv_reg_wren = '1') then
+                    case loc_addr is
+                        when CTRL_REG =>
+                            if ( S_AXI_WSTRB(0) = '1' ) then
+                                -- Respective byte enables are asserted as per write strobes
+                                -- slave registor 4
+                                slv_ctrl_reg <= S_AXI_WDATA(slv_ctrl_reg'range);
+                            end if;
+                        when others =>
+                            slv_ctrl_reg <= slv_ctrl_reg;
+                        end case;
+                end if;
+            end if;
         end if;
-      end if;
     end process;
 
     -- Implement write response logic generation
@@ -365,24 +363,16 @@ begin
     -- and the slave is ready to accept the read address.
     slv_reg_rden <= axi_arready and S_AXI_ARVALID and (not axi_rvalid) ;
 
-    process (slv_fan1_rps, slv_fan2_rps, slv_fan3_rps, slv_fan4_rps, slv_pwm_value1, slv_pwm_value2, axi_araddr)
+    process (slv_stat_reg, slv_ctrl_reg, axi_araddr)
     variable loc_addr :std_logic_vector(OPT_MEM_ADDR_BITS downto 0);
     begin
         -- Address decoding for reading registers
         loc_addr := axi_araddr(ADDR_LSB + OPT_MEM_ADDR_BITS downto ADDR_LSB);
         case loc_addr is
-          when FAN1_RPS_REG =>
-            reg_data_out <= std_logic_vector(resize(unsigned(slv_fan1_rps), 32));
-          when FAN2_RPS_REG =>
-            reg_data_out <= std_logic_vector(resize(unsigned(slv_fan2_rps), 32));
-          when FAN3_RPS_REG =>
-            reg_data_out <= std_logic_vector(resize(unsigned(slv_fan3_rps), 32));
-          when FAN4_RPS_REG =>
-            reg_data_out <= std_logic_vector(resize(unsigned(slv_fan4_rps), 32));
-          when FAN1_PWM_REG =>
-            reg_data_out <= std_logic_vector(resize(unsigned(slv_pwm_value1), 32));
-          when FAN2_PWM_REG =>
-            reg_data_out <= std_logic_vector(resize(unsigned(slv_pwm_value2), 32));
+          when STAT_REG =>
+            reg_data_out <= std_logic_vector(resize(unsigned(slv_stat_reg), 32));
+          when CTRL_REG =>
+            reg_data_out <= std_logic_vector(resize(unsigned(slv_ctrl_reg), 32));
           when others =>
             reg_data_out  <= (others => '0');
         end case;
@@ -411,27 +401,31 @@ begin
     ------------------------------------------------------------------------------------------------
 
     -- instance of fan controller
-    i_axi_fan_ctrl: entity work.fan_ctrl_core
-    port map (
-        clk       => S_AXI_ACLK,
-        rst       => S_AXI_ARESETN,
+    i_board_ctrl_core: entity work.board_ctrl_core
+        port map (
+            clk             => S_AXI_ACLK,
+            rst             => S_AXI_ARESETN,
 
-        -- Input data from sensors
-        fan_sense => fan_sense,
+            -- Control & status signals
+            control         => slv_ctrl_reg,
+            status          => slv_stat_reg,
 
-        -- Output data
-        fan1_rps  => slv_fan1_rps(7 downto 0),
-        fan2_rps  => slv_fan2_rps(7 downto 0),
-        fan3_rps  => slv_fan3_rps(7 downto 0),
-        fan4_rps  => slv_fan4_rps(7 downto 0),
+            -- FPGA IOs
+            pin_L14         => pin_L14,
+            pin_M14         => pin_M14,
+            pin_E11         => pin_E11,
+            pin_E12         => pin_E12,
+            pin_F13         => pin_F13,
+            pin_F14         => pin_F14,
 
-        -- Fan duty cycle input values
-        pwm_value1 => slv_pwm_value1,
-        pwm_value2 => slv_pwm_value2,
+            -- UART J4 interface
+            uart_rxd        => uart_rxd,
+            uart_txd        => uart_txd,
 
-        -- Fan PWM output signal
-        fan_pwm    => fan_pwm
-    );
+            -- Fan Controller
+            fan_pwm         => fan_pwm,
+            fan_sense       => fan_sense
+        );
 
     ------------------------------------------------------------------------------------------------
     -- User logic ends

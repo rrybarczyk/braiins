@@ -50,9 +50,6 @@ entity axi_bm13xx_v1_0 is
         rxd : in  std_logic;
         txd : out std_logic;
 
-        -- enable UART interface IO driver
-        uart_en     : out std_logic;
-
         -- Interrupt Request
         irq_work_tx : out std_logic;
         irq_work_rx : out std_logic;
@@ -99,9 +96,6 @@ architecture rtl of axi_bm13xx_v1_0 is
             rxd : in  std_logic;
             txd : out std_logic;
 
-            -- enable UART interface IO driver
-            uart_en     : out std_logic;
-
             -- Interrupt Request
             irq_work_tx : out std_logic;
             irq_work_rx : out std_logic;
@@ -143,9 +137,6 @@ begin
             -- UART Interface
             rxd => rxd,
             txd => txd,
-
-            -- enable UART interface IO driver
-            uart_en       => uart_en,
 
             -- Interrupt Request
             irq_work_tx   => irq_work_tx,

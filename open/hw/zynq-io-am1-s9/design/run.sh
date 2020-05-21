@@ -28,7 +28,7 @@
 print_help() {
     echo ""
     echo "Usage: ./run.sh BOARD"
-    echo "  BOARD - name of the board, available values: S9, S9k, S11, S15, T15, S17, T17"
+    echo "  BOARD - name of the board, available values: S9, S9k, S11, S15, T15, S17, S17+, T17"
 }
 
 if [ "$1" == "--help" ]; then

@@ -25,7 +25,7 @@
 -- Description:    PWM Generator for Fan with Fixed Frequency
 --
 -- Engineer:       Marian Pristach
--- Revision:       1.0.0 (16.10.2019)
+-- Revision:       1.0.1 (05.05.2020)
 -- Comments:       Frequency 25kHz, resolution 1%, duty cycle 0..100%, glitch-free output
 ----------------------------------------------------------------------------------------------------
 library ieee;
@@ -38,19 +38,23 @@ entity pwm_gen is
         rst   : in  std_logic;
 
         -- Input value in range 0..100%
-        value : in  std_logic_vector(6 downto 0);
+        value1 : in  std_logic_vector(6 downto 0);
+        value2 : in  std_logic_vector(6 downto 0);
 
         -- Output PWM signal
-        pwm   : out std_logic
+        pwm   : out std_logic_vector(1 downto 0)
     );
 end pwm_gen;
 
 architecture rtl of pwm_gen is
 
     ------------------------------------------------------------------------------------------------
-    -- latch for value to avoid glitches in output signal
-    signal value_d   : unsigned(6 downto 0);
-    signal value_q   : unsigned(6 downto 0);
+    -- latch for values to avoid glitches in output signal
+    signal value1_d   : unsigned(6 downto 0);
+    signal value1_q   : unsigned(6 downto 0);
+
+    signal value2_d   : unsigned(6 downto 0);
+    signal value2_q   : unsigned(6 downto 0);
 
     -- counter - base resolution, 2.5MHz = 0.4us @ 50MHz -> 5 bits
     signal cnt_d      : unsigned(4 downto 0);
@@ -64,8 +68,8 @@ architecture rtl of pwm_gen is
     signal cnt_dc_q   : unsigned(6 downto 0);
 
     -- Output register
-    signal pwm_d      : std_logic;
-    signal pwm_q      : std_logic;
+    signal pwm_d      : std_logic_vector(1 downto 0);
+    signal pwm_q      : std_logic_vector(1 downto 0);
 
 begin
 
@@ -77,25 +81,29 @@ begin
             if (rst = '0') then
                 cnt_q <= (others => '0');
                 cnt_done_q <= '0';
-                value_q <= (others => '0');
+                value1_q <= (others => '0');
+                value2_q <= (others => '0');
             else
                 cnt_q <= cnt_d;
                 cnt_done_q <= cnt_done_d;
-                value_q <= value_d;
+                value1_q <= value1_d;
+                value2_q <= value2_d;
             end if;
         end if;
     end process;
 
     -- combinational part of modulo counter (next-state logic)
-    p_cnt_cmb: process (cnt_q, value_q, value) begin
+    p_cnt_cmb: process (cnt_q, value1_q, value2_q, value1, value2) begin
         cnt_d <= cnt_q + 1;
         cnt_done_d <= '0';
-        value_d <= value_q;
+        value1_d <= value1_q;
+        value2_d <= value2_q;
 
         if (cnt_q = 19) then
             cnt_d <= (others => '0');
             cnt_done_d <= '1';
-            value_d <= unsigned(value);
+            value1_d <= unsigned(value1);
+            value2_d <= unsigned(value2);
         end if;
     end process;
 
@@ -105,7 +113,7 @@ begin
         if rising_edge(clk) then
             if (rst = '0') then
                 cnt_dc_q <= (others => '0');
-                pwm_q <= '0';
+                pwm_q <= (others => '0');
             else
                 cnt_dc_q <= cnt_dc_d;
                 pwm_q <= pwm_d;
@@ -125,8 +133,9 @@ begin
         end if;
     end process;
 
-    -- PWM comparator
-    pwm_d <= '1' when (cnt_dc_q < value_q) else '0';
+    -- PWM comparators
+    pwm_d(0) <= '1' when (cnt_dc_q < value1_q) else '0';
+    pwm_d(1) <= '1' when (cnt_dc_q < value2_q) else '0';
 
     ------------------------------------------------------------------------------------------------
     -- output signals

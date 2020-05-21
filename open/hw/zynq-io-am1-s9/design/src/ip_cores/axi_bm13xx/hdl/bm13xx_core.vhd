@@ -41,9 +41,6 @@ entity bm13xx_core is
         rxd               : in  std_logic;
         txd               : out std_logic;
 
-        -- enable UART interface IO driver
-        uart_en           : out std_logic;
-
         -- Interrupt Request
         irq_work_tx       : out std_logic;
         irq_work_rx       : out std_logic;
@@ -1137,9 +1134,6 @@ begin
 
     -- last work ID
     reg_last_work_id <= work_id_tx_q;
-
-    -- enable UART interface IO driver
-    uart_en <= ctrl_enable;
 
 end architecture;
 

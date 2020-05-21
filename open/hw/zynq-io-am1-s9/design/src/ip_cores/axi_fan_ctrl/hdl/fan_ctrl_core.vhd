@@ -25,7 +25,7 @@
 -- Description:    Fan Controller with Speed Monitoring
 --
 -- Engineer:       Marian Pristach
--- Revision:       1.0.0 (11.10.2019)
+-- Revision:       1.0.1 (05.05.2020)
 -- Comments:
 ----------------------------------------------------------------------------------------------------
 library ieee;
@@ -46,11 +46,12 @@ entity fan_ctrl_core is
         fan3_rps  : out std_logic_vector(7 downto 0);
         fan4_rps  : out std_logic_vector(7 downto 0);
 
-        -- Fan duty cycle input value
-        pwm_value : in  std_logic_vector(6 downto 0);
+        -- Fan duty cycle input values
+        pwm_value1 : in  std_logic_vector(6 downto 0);
+        pwm_value2 : in  std_logic_vector(6 downto 0);
 
         -- Fan PWM output signal
-        pwm       : out std_logic
+        fan_pwm    : out std_logic_vector(1 downto 0)
     );
 end fan_ctrl_core;
 
@@ -164,11 +165,12 @@ begin
             clk   => clk,
             rst   => rst,
 
-            -- Input value in range 0..100%
-            value => pwm_value,
+            -- Input values in range 0..100%
+            value1 => pwm_value1,
+            value2 => pwm_value2,
 
             -- Output PWM signal
-            pwm   => pwm
+            pwm   => fan_pwm
         );
 
 

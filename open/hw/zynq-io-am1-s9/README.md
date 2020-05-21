@@ -2,9 +2,9 @@
 
 ## General Parameters of the Platform
 
-**Target Miners:** Antminer S9, S9k, S11, S15, T15, S17, T17
+**Target Miners:** Antminer S9, S9k, S11, S15, T15, S17, S17+, T17
 
-**FPGA Devices:** xc7z010clg400-1 (S9), xc7z007sclg225-1 (S9k, S11, S15, T15, S17, T17)
+**FPGA Devices:** xc7z010clg400-1 (S9), xc7z007sclg225-1 (S9k, S11, S15, T15, S17, S17+, T17)
 
 **Vivado Design Suite version:** 2017.4
 
@@ -36,25 +36,27 @@ UART interfaces of AXI BM13xx IP cores are connected to connectors J6..J8.
 The design is dedicated for S9 miners with C41 control board.
 
 
-### FPGA design for S9k, S11, S15, T15, S17, T17 miners
+### FPGA design for S9k, S11, S15, T15, S17, S17+, T17 miners
 
 FPGA design contains following IP cores:
 - axi_gpio - standard Xilinx GPIO module (2x)
 - axi_iic - standard Xilinx I2C module (2x)
 - axi_fan_ctrl - custom IP core for PWM generation and fan speed monitoring (1x)
+- axi_board_ctrl - custom IP core for configuration board pinout of various version of control boards (1x)
 - axi_bm13xx - custom IP core for communication with hashing chips BM1387, BM1391, BM1393 and BM1397 (4x)
 
-| Name of IP         | Type of IP                      | Base address | Range  | IRQ             | Frequency [MHz] |
-| ------------------ | ------------------------------- | :----------: | :----: | :-------------: | :-------------: |
-| axi_gpio_input     | Xilinx AXI GPIO v2.0            | 0x41200000   | 64kB   | false           | 50              |
-| axi_gpio_output    | Xilinx AXI GPIO v2.0            | 0x41210000   | 64kB   | false           | 50              |
-| axi_iic_hb         | Xilinx AXI I2C v2.0             | 0x41600000   | 64kB   | true (61)       | 50              |
-| axi_iic_psu        | Xilinx AXI I2C v2.0             | 0x41610000   | 64kB   | true (89)       | 50              |
-| axi_fan_ctrl       | Braiins AXI Fan Controller v1.0 | 0x42800000   | 64kB   | false           | 50              |
-| axi_bm13xx_0       | Braiins AXI BM13xx v1.0         | 0x43C00000   | 64kB   | true (62..64)   | 50              |
-| axi_bm13xx_1       | Braiins AXI BM13xx v1.0         | 0x43C10000   | 64kB   | true (65..67)   | 50              |
-| axi_bm13xx_2       | Braiins AXI BM13xx v1.0         | 0x43C20000   | 64kB   | true (68,84,85) | 50              |
-| axi_bm13xx_3       | Braiins AXI BM13xx v1.0         | 0x43C30000   | 64kB   | true (86..88)   | 50              |
+| Name of IP         | Type of IP                        | Base address | Range  | IRQ             | Frequency [MHz] |
+| ------------------ | --------------------------------- | :----------: | :----: | :-------------: | :-------------: |
+| axi_gpio_input     | Xilinx AXI GPIO v2.0              | 0x41200000   | 64kB   | false           | 50              |
+| axi_gpio_output    | Xilinx AXI GPIO v2.0              | 0x41210000   | 64kB   | false           | 50              |
+| axi_iic_hb         | Xilinx AXI I2C v2.0               | 0x41600000   | 64kB   | true (61)       | 50              |
+| axi_iic_psu        | Xilinx AXI I2C v2.0               | 0x41610000   | 64kB   | true (89)       | 50              |
+| axi_fan_ctrl       | Braiins AXI Fan Controller v1.0   | 0x42800000   | 64kB   | false           | 50              |
+| axi_board_ctrl     | Braiins AXI Board Controller v1.0 | 0x42810000   | 64kB   | false           | 50              |
+| axi_bm13xx_0       | Braiins AXI BM13xx v1.0           | 0x43C00000   | 64kB   | true (62..64)   | 50              |
+| axi_bm13xx_1       | Braiins AXI BM13xx v1.0           | 0x43C10000   | 64kB   | true (65..67)   | 50              |
+| axi_bm13xx_2       | Braiins AXI BM13xx v1.0           | 0x43C20000   | 64kB   | true (68,84,85) | 50              |
+| axi_bm13xx_3       | Braiins AXI BM13xx v1.0           | 0x43C30000   | 64kB   | true (86..88)   | 50              |
 
 AXI BM13xx IP cores are connected to connectors J1..J4.
 
@@ -68,13 +70,12 @@ The following table summarizes control boards and their parameters for used mine
 | S15   | C44           | 4                    | 2              | yes     |
 | T15   | C47           | 3                    | 2              | yes     |
 | S17   | C49           | 3                    | 4              | yes     |
+| S17+  | C52           | 4 (3 used)           | 4              | yes     |
 | T17   | C49           | 3                    | 4              | yes     |
 
-Control boards have almost the same FPGA pinouts, the difference is only in J4 connector and fans inputs
-(pins J4.RxD and J4.Txd are shared with FAN3.SENSE and FAN4.SENSE). The design contains a multiplexer to
-switch these pins - switching is based on state of `axi_bm13xx_3` IP core. When the IP core is enabled by
-register CTRL_REG.ENABLE then pins are represented as UART and connected into the IP core. Otherwise
-pins are represented as fan sense inputs and are connected into `axi_fan_ctrl` IP core.
+Control boards have almost the same FPGA pinout, the difference is only in J4 connector and fans inputs
+(pins J4.RxD and J4.Txd are shared with FAN3.SENSE and FAN4.SENSE). The design contains a IP core
+which controls assignment of FPGA pins to defined blocks according to selected board.
 
 
 # AXI BM13xx IP Core Description
@@ -156,7 +157,7 @@ Register is 32-bit width and it is read-only.
 
 
 ### Control Register (CTRL_REG)
-Control register provides commonc configuration of the IP core. Register contains following bits:
+Control register provides common configuration of the IP core. Register contains following bits:
 
 | Bits  | Name             | Access | Reset Value | Description                               |
 | :---: | ---------------- | :----: | :---------: | ----------------------------------------- |
@@ -445,8 +446,9 @@ CRC calculation is executed sequentially - it takes 8 clock cycles for one byte 
 
 # Fan Controller IP Core Description
 
-Fan Controller IP core provides basic control and monitoring speed of fans.
-PWM signal is used to control speed of fans. PWM signal is common for all fans.
+Fan Controller IP core provides monitoring and control speed of fans using PWM signal.
+There are two PWM generators in the IP core however the second one is used only in control board C52 to drive front (inlet) fans.
+Others control boards use only the first PWM generator which is common for all fans.
 Feedback from fans is read to determine real speed of fans. Feedback is individual from each fans.
 IP core supports up to 4 fans.
 
@@ -459,7 +461,8 @@ Address map of registers available through AXI interface:
 | 0x0004  | FAN2_RPS         | R      | 0x00        | Fan 2 Rotation Speed            |
 | 0x0008  | FAN3_RPS         | R      | 0x00        | Fan 3 Rotation Speed            |
 | 0x000C  | FAN4_RPS         | R      | 0x00        | Fan 4 Rotation Speed            |
-| 0x0010  | FAN_PWM          | RW     | 0x00        | PWM Duty Cycle Register         |
+| 0x0010  | FAN_PWM1         | RW     | 0x00        | PWM Duty Cycle Register 1       |
+| 0x0010  | FAN_PWM2         | RW     | 0x00        | PWM Duty Cycle Register 2       |
 
 ### Fan Rotation Speed Registers (FANx_RPS)
 Registers provide information about current speed of fans. Each fan input has one register.
@@ -468,10 +471,58 @@ Value is updated every 500ms. If a fan is stopped then the register contains zer
 Maximum speed is limited to 15300 RPM.
 Registers are 32-bit width but only 8 LSBs contains valid data. Registers are read-only.
 
-### PWM Duty Cycle Register (FAN_PWM)
+### PWM Duty Cycle Registers (FAN_PWMx)
 Register provides settings of fan speed using PWM signal with frequency 25kHz.
 The value represents duty cycle of PWM signal direct in percentage. Usable range of values is 0..100 [%].
+Output signals from both generators are synchronous to each others.
 Register is 32-bit width but only 7 LSBs are used.
+
+
+# Board Controller IP Core
+
+Board Controller IP Core provides configuration of design according to selected board type.
+Control boards have almost the same pinout but there are some small variations according to number of hashboard and fans connectors.
+By configuration of the IP core the internal peripherals are connected to appropriate input/output pins.
+
+## IP Core AXI Interface
+Address map of registers available through AXI interface:
+
+| Address | Name           | Access | Reset Value | Description        |
+| :-----: | ---------------| :----: | :---------: | ------------------ |
+| 0x0000  | STAT_REG       | R      | 0x00        | Status Register    |
+| 0x0004  | CTRL_REG       | RW     | 0x00        | Control Register   |
+
+
+### Status Register (STAT_REG)
+Status register provides status of the configuration and design. Register contains following bits:
+
+| Bits  | Name             | Access | Reset Value | Description        |
+| :---: | ---------------- | :----: | :---------: | ------------------ |
+| 0     | BOARD_SEL_VALID  | R      | 1           | Board Select Valid |
+
+Board Select Valid bit indicates if correct board type was set in control register.
+
+### Control Register (CTRL_REG)
+Control register provides configuration of the design. Register contains following bits:
+
+| Bits  | Name             | Access | Reset Value     | Description        |
+| :---: | ---------------- | :----: | :-------------: | ------------------ |
+| 5..0  | BOARD_SEL        | RW     | C_DEFAULT_BOARD | Board Type Select  |
+
+Default value of Board Type Select is set by generic parameter `C_DEFAULT_BOARD` which is set during synthesis according to defined miner type.
+
+Item Board Type Select support the following values:
+
+| BOARD_SEL | Control Board | Miners       |
+| :-------: | :-----------: | :----------: |
+| 43 (0x2B) | C43           | S9k          |
+| 44 (0x2C) | C44           | S15          |
+| 47 (0x2F) | C47           | S11, T15     |
+| 49 (0x31) | C49           | S17, T17     |
+| 52 (0x34) | C52           | S17+         |
+
+Other values are invalid and the design is configured in minimum operating state (equivalent to configuration for C47 board).
+Also the bit BOARD_SEL_VALID in status register is set to 0.
 
 
 # Synthesis and Verification

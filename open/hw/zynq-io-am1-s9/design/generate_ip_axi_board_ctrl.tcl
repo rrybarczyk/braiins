@@ -25,7 +25,7 @@
 ####################################################################################################
 # Generate IP core
 ####################################################################################################
-set ip_name "uart_mux"
+set ip_name "axi_board_ctrl"
 set ip_library "ip"
 set ip_version "1.0"
 set ip_vendor "braiins.com"
@@ -34,7 +34,9 @@ set ip_repo [file join $projdir ip_repo]
 
 # Set list of VHDL files in compilation order
 set ip_hdl_files [ list \
-    "uart_mux.vhd" \
+    "board_ctrl_core.vhd" \
+    "board_ctrl_S_AXI.vhd" \
+    "axi_board_ctrl_v1_0.vhd" \
 ]
 
 timestamp "Generating IP core ${ip_name} ..."
@@ -54,7 +56,16 @@ if [file exists $ip_repo_path] {
 ####################################################################################################
 # Create new IP peripheral core
 ####################################################################################################
-ipx::infer_core -vendor $ip_vendor -library $ip_library -root_dir $ip_repo_path -files [file join $src_path $ip_hdl_files]
+create_peripheral ${ip_vendor} ${ip_library} ${ip_name} ${ip_version} -dir $ip_repo
+
+set ip_core [ipx::find_open_core $ip_id]
+
+add_peripheral_interface S_AXI -interface_mode slave -axi_type lite $ip_core
+set_property VALUE 5 [ipx::get_bus_parameters WIZ_NUM_REG -of_objects [ipx::get_bus_interfaces S_AXI -of_objects $ip_core]]
+generate_peripheral -driver -bfm_example_design -debug_hw_example_design $ip_core
+write_peripheral $ip_core
+
+# set_property ip_repo_paths {} [current_project]
 
 ####################################################################################################
 # Open IP core for edit
@@ -67,27 +78,15 @@ set project_dir ${ip_name}_${ip_version}
 ipx::edit_ip_in_project -upgrade true -name $ipx_project -directory ${projdir}/system.tmp/${ipx_project} $ipx_xml
 
 # set additional information about IP core
-set_property display_name "UART Multiplexer" [ipx::current_core]
-set_property description "UART-Fan Multiplexer IP core" [ipx::current_core]
+set_property display_name "Board Controller" [ipx::current_core]
+set_property description "Board Controller IP core for FPGA IOs configuration" [ipx::current_core]
 set_property company_url "http://www.braiins.com" [ipx::current_core]
-
-# remove original file groups;
-ipx::remove_file_group xilinx_anylanguagesynthesis [ipx::current_core]
-ipx::remove_file_group xilinx_anylanguagebehavioralsimulation [ipx::current_core]
-
-# create new file groups
-ipx::add_file_group -type vhdl:synthesis {} [ipx::current_core]
-ipx::add_file_group -type vhdl:simulation {} [ipx::current_core]
+set_property supported_families "Zynq Production" [ipx::current_core]
 
 set vhdl_synth_group [ipx::get_file_groups xilinx_vhdlsynthesis -of_objects [ipx::current_core]]
 set vhdl_sim_group [ipx::get_file_groups xilinx_vhdlbehavioralsimulation -of_objects [ipx::current_core]]
 
 set ip_hdl_list {}
-
-# create directory if not exists
-if { ![file exists "${ip_repo_path}/hdl"] } {
-    file mkdir "${ip_repo_path}/hdl"
-}
 
 # copy source files into IP core directory
 foreach FILE $ip_hdl_files {
@@ -109,14 +108,39 @@ foreach FILE $ip_hdl_list {
 # Copy list of synthesis group into simulation group
 ipx::copy_contents_from $vhdl_synth_group $vhdl_sim_group
 
-set_property model_name $ip_name $vhdl_synth_group
-set_property model_name $ip_name $vhdl_sim_group
+# remove unused files
+ipx::remove_file "hdl/${ip_name}_v1_0_S_AXI.vhd" $vhdl_synth_group
+ipx::remove_file "hdl/${ip_name}_v1_0_S_AXI.vhd" $vhdl_sim_group
 
 # Update parameters and ports according to RTL sources
 ipx::merge_project_changes hdl_parameters [ipx::current_core]
 ipx::merge_project_changes ports [ipx::current_core]
 
+
+####################################################################################################
+# Custom parameters
+####################################################################################################
+# Custom parameter - default board
+dict set ctrl_boards "S9"   41
+dict set ctrl_boards "S9k"  43
+dict set ctrl_boards "S11"  47
+dict set ctrl_boards "S15"  44
+dict set ctrl_boards "T15"  47
+dict set ctrl_boards "S17"  49
+dict set ctrl_boards "S17+" 52
+dict set ctrl_boards "T17"  49
+
+set ctrl_board [dict get $ctrl_boards $board]
+puts "INFO: Default control board: C$ctrl_board"
+
+set_property value $ctrl_board [ipx::get_user_parameters C_DEFAULT_BOARD -of_objects [ipx::current_core]]
+set_property value $ctrl_board [ipx::get_hdl_parameters C_DEFAULT_BOARD -of_objects [ipx::current_core]]
+
+####################################################################################################
+# Update and save project
+####################################################################################################
 ipx::create_xgui_files [ipx::current_core]
 ipx::update_checksums [ipx::current_core]
 ipx::save_core [ipx::current_core]
 close_project
+

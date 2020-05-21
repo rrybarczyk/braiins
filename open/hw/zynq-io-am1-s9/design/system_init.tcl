@@ -48,8 +48,8 @@ if ![file exists $results_dir] {file mkdir $results_dir}
 # Generate IP Cores
 ####################################################################################################
 source generate_ip_axi_bm13xx.tcl
+source generate_ip_axi_board_ctrl.tcl
 source generate_ip_axi_fan_ctrl.tcl
-source generate_ip_uart_mux.tcl
 
 ####################################################################################################
 # Add IP Repositories to search path
