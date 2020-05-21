@@ -92,11 +92,14 @@ impl Decoder for Codec {
     }
 }
 
-impl Encoder for Codec {
-    type Item = support::ResponseType;
+impl Encoder<support::ResponseType> for Codec {
     type Error = io::Error;
 
-    fn encode(&mut self, item: Self::Item, dst: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(
+        &mut self,
+        item: support::ResponseType,
+        dst: &mut BytesMut,
+    ) -> Result<(), Self::Error> {
         self.encode_buf.clear();
         json::to_writer(&mut self.encode_buf, &item)?;
         dst.reserve(self.encode_buf.len() + 1);

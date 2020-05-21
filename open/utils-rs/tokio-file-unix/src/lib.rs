@@ -341,11 +341,10 @@ impl<D: Into<u8> + Clone> Decoder for DelimCodec<D> {
     }
 }
 
-impl<D: Into<u8> + Clone> Encoder for DelimCodec<D> {
-    type Item = Vec<u8>;
+impl<D: Into<u8> + Clone> Encoder<Vec<u8>> for DelimCodec<D> {
     type Error = io::Error;
 
-    fn encode(&mut self, msg: Self::Item, buf: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, msg: Vec<u8>, buf: &mut BytesMut) -> Result<(), Self::Error> {
         buf.extend(msg);
         buf.put_u8(self.0.clone().into());
         Ok(())
