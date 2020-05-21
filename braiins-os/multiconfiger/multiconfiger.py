@@ -7,6 +7,7 @@ import argparse
 import csv
 import json
 import urllib.parse
+import html.parser
 from pprint import pprint
 import re
 
@@ -53,6 +54,8 @@ fields = [
     # autotuning
     'autotuning',
     'power_limit',
+    # password is never loaded, but can be changed
+    'password',
 ]
 
 
@@ -114,6 +117,7 @@ def main(args):
             for line_no, row in enumerate(reader, 1):
                 try:
                     host = row['host'].strip()
+                    password = row['password'].strip()
                     if line_no == 1 and host == fields[0] or host == '':
                         continue
                     print('Pushing to %s (%d/%d)' % (host, line_no, total))
@@ -126,6 +130,13 @@ def main(args):
                         api.set_config(csvizer.cfg)
                         if args.action == 'save_apply':
                             api.apply_config()
+                        # password is part of system administration, not miner config
+                        if password:
+                            print(
+                                'Changing password for %s (%d/%d)'
+                                % (host, line_no, total)
+                            )
+                            api.set_password(password)
                 except Exception as ex:
                     log_error(row)
                     if args.ignore:
@@ -410,6 +421,25 @@ class InvalidUser(CsvizerError):
     hint = 'invalid pool user'
 
 
+class LuciAdminFormParser(html.parser.HTMLParser):
+    """
+    Helper for getting csrf token in administration web
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.token = None
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if (
+            tag == 'input'
+            and attrs.get('type') == 'hidden'
+            and attrs.get('name') == 'token'
+        ):
+            self.token = attrs.get('value')
+
+
 class BosApi:
     """
     Wrapper over bosminer json api. It's main function is to get and hold authentication cookie.
@@ -490,6 +520,35 @@ class BosApi:
         if document.get('status', {}).get('code') != 0:
             raise ConfigApplyFailed(document)
 
+    def set_password(self, password):
+
+        # we need admin page to obtain csrf token
+        response = requests.get(
+            self.get_url('/cgi-bin/luci/admin/system/admin'), cookies=self.authcookie
+        )
+        response.raise_for_status()
+
+        parser = LuciAdminFormParser()
+        parser.feed(response.content.decode('utf8'))
+        if not parser.token:
+            raise MissingToken()
+
+        # save the password. there is more in the form which we skip over
+        # using None for filename is undocumented feature of requests lib
+        form = {
+            'token': (None, parser.token),
+            'cbi.submit': (None, '1'),
+            'cbid.system._pass.pw1': (None, password),
+            'cbid.system._pass.pw2': (None, password),
+        }
+        response = requests.post(
+            self.get_url('/cgi-bin/luci/admin/system/admin'),
+            cookies=self.authcookie,
+            allow_redirects=False,
+            files=form,
+        )
+        response.raise_for_status()
+
 
 class BosApiError(RuntimeError):
     pass
@@ -504,6 +563,10 @@ class ErrorResponse(BosApiError):
                 document.get('status', {}).get('message'),
             )
         )
+
+
+class MissingToken(BosApiError):
+    pass
 
 
 class UnsupportedDevice(BosApiError):
