@@ -444,10 +444,20 @@ class CommandManager:
     def listen(self):
         s = socket(AF_INET, SOCK_DGRAM)
         s.bind(('', IP_REPORT_PORT))
+        responses = {}
         while True:
             m = s.recvfrom(IP_REPORT_BUFF)
-            ip_addr, mac_addr = m[0].decode('utf-8').split(',')
-            print(self._args.format.format(IP=ip_addr, MAC=mac_addr))
+            ip_addr, port_addr = m[1]
+            response = m[0].decode('utf-8')
+            if response == 'OK\0' and ip_addr in responses:
+                mac_addr = responses[ip_addr]
+                del responses[ip_addr]
+                print(self._args.format.format(IP=ip_addr, MAC=mac_addr))
+            else:
+                response_ip_addr, mac_addr = response.split(',')
+                if ip_addr == response_ip_addr:
+                    s.sendto(mac_addr.encode('utf-8'), (ip_addr, port_addr))
+                    responses[ip_addr] = mac_addr
 
 def call_command(command, command_method, args):
     command.set_args(args)
