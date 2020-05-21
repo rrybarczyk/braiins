@@ -52,7 +52,6 @@ core:
 
 core_tools:
   list:
-    - socat
     - bos_tools
     - miner_tools
 
