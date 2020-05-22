@@ -37,7 +37,7 @@ build:
   # name of subdirectory in the build directory
   name: '{target}'
   # build version which can be accessed with tag '{build_version}'
-  version: 20.05
+  version: 20.06
   # suffix added to firmware version
   version_suffix: -{build_version}-nightly
   # record used in feeds to distinguish current build
