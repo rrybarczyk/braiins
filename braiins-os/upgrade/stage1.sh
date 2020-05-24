@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Copyright (C) 2019  Braiins Systems s.r.o.
+# Copyright (C) 2020  Braiins Systems s.r.o.
 #
 # This file is part of Braiins Open-Source Initiative (BOSI).
 #
@@ -113,10 +113,11 @@ echo "Writing U-Boot environment..."
 nandwrite -ps ${UBOOT_ENV1_OFF} /dev/mtd${UBOOT_ENV_MTD} "$UBOOT_ENV_DATA" 2>&1
 nandwrite -ps ${UBOOT_ENV2_OFF} /dev/mtd${UBOOT_ENV_MTD} "$UBOOT_ENV_DATA" 2>&1
 
+erase_mtd ${SRC_KERNEL_MTD} 2>&1
 erase_mtd ${SRC_STAGE2_MTD} 2>&1
 
 echo "Writing kernel image..."
-nandwrite -ps ${SRC_KERNEL_OFF} /dev/mtd${SRC_STAGE2_MTD} "$KERNEL_IMAGE" 2>&1
+nandwrite -ps ${SRC_KERNEL_OFF} /dev/mtd${SRC_KERNEL_MTD} "$KERNEL_IMAGE" 2>&1
 
 echo "Writing stage2 tarball..."
 nandwrite -ps ${SRC_STAGE2_OFF} /dev/mtd${SRC_STAGE2_MTD} "$STAGE2_FIRMWARE" 2>&1
@@ -127,7 +128,6 @@ if [ -f "$STAGE3_FIRMWARE" ]; then
 	nandwrite -ps ${SRC_STAGE3_OFF} /dev/mtd${SRC_STAGE3_MTD} "$STAGE3_FIRMWARE" 2>&1
 	dst_stage3_off=${DST_STAGE3_OFF}
 	dst_stage3_size=$(file_size "$STAGE3_FIRMWARE")
-	dst_stage3_mtd=${DST_STAGE3_MTD}
 fi
 
 echo "U-Boot configuration..."
@@ -149,12 +149,12 @@ fw_setenv -c "$UBOOT_ENV_CFG" --script - <<-EOF
 	# set firmware stage2 metadata
 	stage2_off ${DST_STAGE2_OFF}
 	stage2_size $(file_size "$STAGE2_FIRMWARE")
-	stage2_mtd ${DST_STAGE2_MTD}
+	stage2_mtd 9
 	#
 	# set firmware stage3 metadata
 	stage3_off ${dst_stage3_off}
 	stage3_size ${dst_stage3_size}
-	stage3_mtd ${dst_stage3_mtd}
+	stage3_mtd 9
 	#
 	ethaddr ${ETHADDR}
 	#

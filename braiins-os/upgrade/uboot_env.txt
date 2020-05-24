@@ -3,7 +3,7 @@ fdt_high=0x7FFFFFF
 initrd_high=0x7FFFFFF
 bitstream_addr=0x2100000
 bootenv=uEnv.txt
-set_bootargs=setenv bootargs console=ttyPS0,115200 root=/dev/ram0 r rootfstype=squashfs ${mtdparts} earlyprintk
+set_bootargs=setenv bootargs console=ttyPS0,115200 root=/dev/ram0 r rootfstype=squashfs ${mtdparts},256m@0x0(nand) earlyprintk
 uenv_load=load mmc 0 ${load_addr} ${bootenv} && echo Loaded environment from ${bootenv} && env import -t ${load_addr} ${filesize}
 load_fpga=nand read ${load_addr} ${bitstream_off} ${bitstream_size} && unzip ${load_addr} ${bitstream_addr} && fpga loadb 0 ${bitstream_addr} ${bitstream_size}
 nandboot=echo Copying FIT from NAND flash to RAM... && run uenv_load; test x${sd_boot} = xyes && run sdboot; run set_bootargs && run load_fpga && nand read ${load_addr} ${kernel_off} ${kernel_size} && bootm ${load_addr}

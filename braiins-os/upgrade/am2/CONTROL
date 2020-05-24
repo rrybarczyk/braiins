@@ -1,4 +1,4 @@
-# Copyright (C) 2019  Braiins Systems s.r.o.
+# Copyright (C) 2020  Braiins Systems s.r.o.
 #
 # This file is part of Braiins Open-Source Initiative (BOSI).
 #
@@ -22,7 +22,7 @@
 
 export PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin
 
-BMMINER_CONF_PATH="/tmp/bmminer.conf"
+CGMINER_CONF_PATH="/tmp/cgminer.conf"
 
 flash_eraseall() {
 	flash_erase "$1" 0 0
@@ -32,8 +32,8 @@ file_size() {
 	printf "0x%x" $(stat -c "%s" "$1")
 }
 
-get_bm_config() {
-	json_get "$BMMINER_CONF_PATH" "$1"
+get_cg_config() {
+	json_get "$CGMINER_CONF_PATH" "$1"
 }
 
 get_net_config() {
@@ -54,21 +54,15 @@ check_mtd_hash() {
 
 default_hostname="antMiner"
 
-mtd_hash_expected="\
-8bc020c6db888c7e8062fbbd4a6fb2a6 \
-dbed76afa7bff618ddea25b0c4ba69a7"
+mtd_hash_expected="24a7d1bb61b65e18801e8398acf62861"
 mtd_hash=$(cat /proc/mtd | md5sum | awk '{print $1}')
 
 ETHADDR=$(cat /sys/class/net/eth0/address)
-ANTMINER_CB=$(cat /usr/bin/ctrl_bd)
 ANTMINER_VER=$(sed -n 2p /usr/bin/compile_time)
 
 case "$ANTMINER_VER" in
-	"Antminer S9"|\
-	"Antminer S9i"|\
-	"Antminer S9j"|\
-	"Antminer R4")
-		MINER_HWVER=S9
+	"Antminer S15")
+		MINER_HWVER=S15
 		;;
 esac
 
@@ -85,11 +79,6 @@ UBOOT_MTD=0
 BITSTREAM_MTD=0
 UBOOT_ENV_MTD=0
 
-if [ x"${ANTMINER_CB}" != x"XILINX" ]; then
-	echo "Unsupported control board: ${ANTMINER_CB}" >&2
-	exit 1
-fi
-
 if ! check_mtd_hash $mtd_hash $mtd_hash_expected; then
 	echo "Unsupported miner NAND partitioning" >&2
 	cat /proc/mtd >&2
@@ -102,18 +91,17 @@ if [ "x${MINER_HWVER}" != "x${FW_MINER_HWVER}" ]; then
 fi
 
 SRC_KERNEL_OFF=0x0000000
-DST_KERNEL_OFF=0xB000000
-SRC_STAGE2_OFF=0x0A00000
-DST_STAGE2_OFF=0x3D00000
-SRC_STAGE3_OFF=0x2800000
-DST_STAGE3_OFF=0x5B00000
-SRC_STAGE2_MTD=2
-DST_STAGE2_MTD=8
-SRC_STAGE3_MTD=2
-DST_STAGE3_MTD=8
+DST_KERNEL_OFF=0x5000000
+SRC_STAGE2_OFF=0x0000000
+DST_STAGE2_OFF=0x2800000
+SRC_STAGE3_OFF=0x0000000
+DST_STAGE3_OFF=0x6000000
+SRC_KERNEL_MTD=3
+SRC_STAGE2_MTD=1
+SRC_STAGE3_MTD=4
 
 # copy config to temp to prevent possible modifications
-cp -f "/config/bmminer.conf" "$BMMINER_CONF_PATH"
+cp -f "/config/cgminer.conf" "$CGMINER_CONF_PATH"
 
 # save network settings
 NET_HOSTNAME=$(get_net_config "hostname")
@@ -123,18 +111,17 @@ NET_GATEWAY=$(get_net_config "gateway")
 NET_DNS_SERVERS=$(get_net_config "dnsservers" | tr " " ,)
 
 # save all local settings
-MINER_FREQ=$(get_bm_config "bitmain-freq")
-MINER_VOLTAGE=$(get_bm_config "bitmain-voltage")
-MINER_FIXED_FREQ=$(get_bm_config "fixed-freq")
+MINER_FREQ=$(get_cg_config "bitmain-freq")
+MINER_VOLTAGE=$(get_cg_config "bitmain-voltage")
 
 # save all pools
-MINER_POOL_COUNT=$(json_array_len "$BMMINER_CONF_PATH" pools)
+MINER_POOL_COUNT=$(json_array_len "$CGMINER_CONF_PATH" pools)
 
 for i in $(seq 1 $MINER_POOL_COUNT); do
 	index=$(($i - 1))
-	url=$(get_bm_config "pools.$index.url")
-	user=$(get_bm_config "pools.$index.user")
-	pass=$(get_bm_config "pools.$index.pass")
+	url=$(get_cg_config "pools.$index.url")
+	user=$(get_cg_config "pools.$index.user")
+	pass=$(get_cg_config "pools.$index.pass")
 
 	host=${url%:*}
 	port=${url##*:}
