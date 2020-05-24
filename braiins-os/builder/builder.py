@@ -1891,7 +1891,7 @@ class Builder:
         upload_manager.pop_dir()
 
         # copy system dependencies
-        if version[0] == self.UPGRADE_AM1:
+        if version[0] in (self.UPGRADE_AM1, self.UPGRADE_AM2):
             upload_manager.push_dir(self.UPGRADE_SYSTEM_DIR)
             if not base_system:
                 build_dir = os.path.join(self._working_dir, 'build_dir', 'target-arm_cortex-a9+neon_musl-1.1.16_eabi')
@@ -1900,6 +1900,8 @@ class Builder:
                                                 'ld-musl-armhf.so.1'), 'ld-musl-armhf.so.1')
                 upload_manager.put(os.path.join(build_dir, 'u-boot-2018.03', 'ipkg-arm_cortex-a9_neon',
                                                 'uboot-envtools', 'usr', 'sbin', 'fw_printenv'), 'fw_printenv')
+                if version[0] == self.UPGRADE_AM2:
+                    upload_manager.put(os.path.join(build_dir, 'busybox-1.25.1', 'busybox'), 'busybox')
                 if version != self.UPGRADE_AM1_WEB:
                     upload_manager.put(os.path.join(build_dir, 'openssh-without-pam', 'openssh-7.4p1',
                                                     'sftp-server'), 'sftp-server')
