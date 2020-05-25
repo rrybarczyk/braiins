@@ -1,4 +1,4 @@
-# Copyright (C) 2019  Braiins Systems s.r.o.
+# Copyright (C) 2020  Braiins Systems s.r.o.
 #
 # This file is part of Braiins Open-Source Initiative (BOSI).
 #
@@ -39,39 +39,31 @@ from .transfer import Progress
 from .util import get_data_root_path
 
 CONFIG_TAR = 'config.tar.gz'
-# Directory within the factory .tar.gz that contains all necessary firmware files.
-# Note, that its content will be directly extracted and uploaded onto the target
-# hardware, therefore there is no need for get_data_root_path() element to be prepended
-XILINX_DIR = 'xilinx/'
 TARGET_DIR = '/tmp/bitmain_fw'
 
 RESTORE_DIR = os.path.join(get_data_root_path(), 'upgrade')
 RESTORE_NAME = 'restore.sh'
 
+BACKUP_SUFFIX = '_tmp'
+
 FACTORY_MTDPARTS = \
-    'mtdparts=pl35x-nand:32m(BOOT.bin-env-dts-kernel),144m(angstram-rootfs),80m(upgrade-rootfs)'
+    'mtdparts=pl35x-nand:40m(BOOT.bin-env-dts-kernel),32m(ramfs),8m(configs),16m(reserve),32m(ramfs-bak),128m(reserve1)'
 
 SUPPORTED_IMAGES = [
-    # Antminer-S9-all-201812051512-autofreq-user-Update2UBI-NF.tar.gz
-    '0b9a8134c5c2cae1f7723aad96df4867',
-    # Antminer-S9-all-201711171757-autofreq-user-Update2UBI-NF.tar.gz
-    '9974dd88b70cdaaa89a4dd55c25d5bc1',
-    # Antminer-S9i-xilinx-201811301418-autofreq-user-Update2UBI-NF.tar.gz
-    'fb2a59f0bbfabc1d287fbd6eec9bff98',
-    # Antminer-S9i-all-201811071119-autofreq-user-Update2UBI-NF.tar.gz
-    '5b07bd845685d81c092a3b0465f24ef1',
-    # Antminer-S9j-xilinx-201811301411-autofreq-user-Update2UBI-NF.tar.gz
-    '95598a094dbc52bd8227cb049f73376e',
-    # Antminer-S9j-all-201811071118-autofreq-user-Update2UBI-NF.tar.gz
-    '5ab21bac208a1ce18defabe615e2e197',
-    # Antminer-R4-all-201704280718-autofreq-user-Update2UBI-NF.tar.gz
-    '7f541a58a4ee559105894c94ff301108'
+    # Antminer-S15-user-OM-201912131535-ssh.tar.gz
+    '200654af5ea5f22b479049c5a8269b3d'
 ]
 
 SYSTEM_BINARIES = [
     ('ld-musl-armhf.so.1', '/lib'),
     ('sftp-server', '/usr/lib/openssh'),
-    ('fw_printenv', '/usr/sbin')
+    ('fw_printenv', '/usr/sbin'),
+    ('busybox1.25', '/bin')
+]
+
+SYSTEM_LINKS = [
+    ('/usr/sbin/fw_setenv', '/usr/sbin/fw_printenv'),
+    ('/usr/bin/awk', '/bin/busybox1.25')
 ]
 
 
@@ -103,11 +95,7 @@ def upload_bitmain_files(sftp, stream):
     with tarfile.open(fileobj=stream, mode='r|*') as tarball:
         for member in tarball:
             member_file = tarball.extractfile(member)
-            if not member.name.startswith(XILINX_DIR):
-                if not member.isdir():
-                    print("Skipping '{}'".format(member.name))
-                continue
-            name = member.name[len(XILINX_DIR):]
+            name = member.name
             with Progress(name, member.size) as progress:
                 sftp.putfo(member_file, name, callback=progress)
 
@@ -280,7 +268,14 @@ def prepare_system(ssh, path):
         ssh.put(os.path.join(path, file_name), remote_file_name)
         ssh.run('chmod', '+x', remote_file_name)
 
-    ssh.run('ln', '-fs', '/usr/sbin/fw_printenv', '/usr/sbin/fw_setenv')
+    for link_name, remote_path in SYSTEM_LINKS:
+        try:
+            ssh.run('test', '!', '-e', link_name)
+        except subprocess.CalledProcessError:
+            ssh.run('mv', link_name, link_name + BACKUP_SUFFIX)
+        ssh.run('mkdir', '-p', os.path.dirname(link_name))
+        ssh.run('ln', '-fs', remote_path, link_name)
+
     print()
 
 
@@ -289,13 +284,19 @@ def cleanup_system(ssh):
         remote_file_name = '{}/{}'.format(remote_path, file_name)
         ssh.run('rm', '-r', remote_file_name)
 
-    ssh.run('rm', '/usr/sbin/fw_setenv')
+    for link_name, remote_path in SYSTEM_LINKS:
+        try:
+            ssh.run('test', '!', '-e', link_name + BACKUP_SUFFIX)
+        except subprocess.CalledProcessError:
+            ssh.run('mv', link_name + BACKUP_SUFFIX, link_name)
+        else:
+            ssh.run('rm', link_name)
 
 
 def add_restore_arguments(parser):
-    if getattr(sys, 'frozen', False):
-        default_factory_fw = os.path.join(get_data_root_path(),
-                                          'Antminer-S9-all-201812051512-autofreq-user-Update2UBI-NF.tar.gz')
+    frozen_factory_fw = getattr(sys, 'frozen_factory_fw', None)
+    if frozen_factory_fw:
+        default_factory_fw = os.path.join(get_data_root_path(), frozen_factory_fw)
         default_factory_fw_help = " (default: {})".format(os.path.basename(
             default_factory_fw))
     else:
@@ -303,5 +304,5 @@ def add_restore_arguments(parser):
         default_factory_fw_help = ""
 
     parser.add_argument('--factory-image', default=default_factory_fw,
-                        help='path/url to original firmware upgrade image{}'.format(
+                        help='path/url to firmware upgrade image{}'.format(
                             default_factory_fw_help))
