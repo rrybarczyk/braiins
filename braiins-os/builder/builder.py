@@ -156,6 +156,8 @@ class Builder:
     UPGRADE_MINER_CFG_CONFIG = 'miner_cfg.config'
     UPGRADE_SCRIPT_SRC = 'upgrade.py'
     UPGRADE_SCRIPT = 'upgrade2bos.py'
+    UPGRADE_UTIL_SRC = 'util.py'
+    UPGRADE_UTIL = 'util.py'
     UPGRADE_PLATFORM_SCRIPT_SRC = 'platform.py'
     UPGRADE_PLATFORM_SCRIPT = 'platform.py'
     UPGRADE_BACKUP_SCRIPT_SRC = 'backup.py'
@@ -1901,7 +1903,7 @@ class Builder:
                 upload_manager.put(os.path.join(build_dir, 'u-boot-2018.03', 'ipkg-arm_cortex-a9_neon',
                                                 'uboot-envtools', 'usr', 'sbin', 'fw_printenv'), 'fw_printenv')
                 if version[0] == self.UPGRADE_AM2:
-                    upload_manager.put(os.path.join(build_dir, 'busybox-1.25.1', 'busybox'), 'busybox')
+                    upload_manager.put(os.path.join(build_dir, 'busybox-1.25.1', 'busybox'), 'busybox1.25')
                 if version != self.UPGRADE_AM1_WEB:
                     upload_manager.put(os.path.join(build_dir, 'openssh-without-pam', 'openssh-7.4p1',
                                                     'sftp-server'), 'sftp-server')
@@ -1940,6 +1942,8 @@ class Builder:
             upload_manager.put(hwid, self.LEDE_META_HWID)
             ssh = self._get_project_file(self.LEDE_META_DIR, self.LEDE_META_SSH)
             upload_manager.put(ssh, self.LEDE_META_SSH)
+            platform = self._get_upgrade_file(self.UPGRADE_UTIL_SRC, version)
+            upload_manager.put(platform, self.UPGRADE_UTIL)
             platform = self._get_upgrade_file(self.UPGRADE_PLATFORM_SCRIPT_SRC, version)
             upload_manager.put(platform, self.UPGRADE_PLATFORM_SCRIPT)
             backup = self._get_upgrade_file(self.UPGRADE_BACKUP_SCRIPT_SRC, version)
