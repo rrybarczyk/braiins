@@ -128,10 +128,17 @@ MINER_FIXED_FREQ=$(get_bm_config "fixed-freq")
 
 # save all pools
 MINER_POOL_COUNT=$(json_array_len "$BMMINER_CONF_PATH" pools)
+pool_count=0
 
 for i in $(seq 1 $MINER_POOL_COUNT); do
 	index=$(($i - 1))
 	url=$(get_bm_config "pools.$index.url")
+
+	# check if there is some URL
+	[ -n "$url" ] || continue
+	pool_count=$(($pool_count + 1))
+	i=$pool_count
+
 	user=$(get_bm_config "pools.$index.user")
 	pass=$(get_bm_config "pools.$index.pass")
 
@@ -144,6 +151,9 @@ for i in $(seq 1 $MINER_POOL_COUNT); do
 	eval MINER_POOL_USER_$i='$user'
 	eval MINER_POOL_PASS_$i='$pass'
 done
+
+# set real pool count without empty URL
+MINER_POOL_COUNT=$pool_count
 
 if [ x"$KEEP_HOSTNAME" == x"cond" ]; then
 	# keep hostname only if it has been changed by user
