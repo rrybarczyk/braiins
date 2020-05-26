@@ -74,8 +74,8 @@ architecture RTL of uart is
     constant MOD_DIVISON_WIDTH     : natural := 12;       -- define width of division register
 
     ------------------------------------------------------------------------------------------------
-    -- synchronization RxD into clk clock domain
-    signal rxd_q0                   : std_logic_vector(2 downto 0);
+    -- synchronized RxD signal
+    signal rxd_q                    : std_logic;
 
     ------------------------------------------------------------------------------------------------
     -- UART specific registers, flags and signals
@@ -112,16 +112,16 @@ architecture RTL of uart is
 begin
 
     ------------------------------------------------------------------------------------------------
-    -- synchronization RxD into clk clock domain
-    process (clk) begin
-        if rising_edge(clk) then
-            if (rst = '0') then
-                rxd_q0 <= (others => '1');
-            else
-                rxd_q0 <= rxd & rxd_q0(2 downto 1);
-            end if;
-        end if;
-    end process;
+    -- synchronization of RxD input and glitch filter
+    i_debouncer_rxd: entity work.uart_debouncer
+        port map (
+            clk     => clk,
+            rst     => rst,
+            -- Input data
+            input   => rxd,
+            -- Output data
+            output  => rxd_q
+        );
 
     ------------------------------------------------------------------------------------------------
     -- peripheral registers
@@ -243,7 +243,7 @@ begin
         -- clock enable signal from baud rate generator
         clk_en    => clk_en_uart,
         -- UART interfacce
-        rxd       => rxd_q0(0),
+        rxd       => rxd_q,
         -- parallel output
         rx_done   => rx_fifo_wr,
         rx_data   => rx_fifo_data_w,

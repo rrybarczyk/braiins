@@ -124,6 +124,8 @@ close $fd
 
 # check result of simulation
 if { $ok != 1 } {
+    puts [string repeat "-" 80]
     puts "ERROR: \[axi_bm13xx\]: Verification failed, check simulation report"
+    puts [string repeat "-" 80]
 #     exit 1
 }

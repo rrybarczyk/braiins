@@ -1846,8 +1846,8 @@ module axi_bm13xx_tb();
         for (int i = 0; i < array.size; i++) begin
             i_uart.send_frame_tx(array[i]);
         end
-        // wait until CRC is calculated
-        #(8 * array.size * CLK_PERIOD);
+        // wait until CRC is calculated + some margin
+        #(8 * array.size * CLK_PERIOD + 50);
     endtask
 
     // ---------------------------------------------------------------------------------------------

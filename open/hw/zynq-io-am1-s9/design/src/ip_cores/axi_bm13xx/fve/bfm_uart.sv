@@ -39,13 +39,11 @@ module uart_bfm(input logic rx, output logic tx);
     time UART_PERIOD = 320ns;
 
     // local signals and registers
-    int drive_tx = 0;
     logic tx_int = 1'b1;
     logic[7:0] rcv_data;
     event ev_uart_rx;
 
     task send_frame_tx(logic[7:0] tx_data);
-        drive_tx = 1;
         tx_int = 1'b0;
         # UART_PERIOD;
 
@@ -56,10 +54,9 @@ module uart_bfm(input logic rx, output logic tx);
 
         tx_int = 1'b1;      // stop bit
         # UART_PERIOD;
-        drive_tx = 0;
     endtask
 
-    assign tx = drive_tx ? tx_int : 1'b1;
+    assign tx = tx_int;
 
     // receiver
     always begin

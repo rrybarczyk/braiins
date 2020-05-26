@@ -41,6 +41,7 @@ set ip_hdl_files [ list \
     "fifo_block_thr.vhd" \
     "fifo_distr.vhd" \
     "mod_divider.vhd" \
+    "uart_debouncer.vhd" \
     "uart_rx.vhd" \
     "uart_tx.vhd" \
     "uart.vhd" \
