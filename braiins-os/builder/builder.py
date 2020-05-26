@@ -131,6 +131,7 @@ class Builder:
     UPGRADE_AM1_WEB = (UPGRADE_AM1, 'web')
     UPGRADE_AM2 = 'am2'
     UPGRADE_AM2_SSH = (UPGRADE_AM2, UPGRADE_SSH)
+    UPGRADE_AM2_WEB = (UPGRADE_AM2, 'web')
     UPGRADE_VERSION = {
         'zynq-dm1': [
             (UPGRADE_DM1_SSH, (ARCHIVE_TGZ, [])),
@@ -141,7 +142,8 @@ class Builder:
             (UPGRADE_AM1_WEB, (ARCHIVE_TGZ, [ARCHIVE_FLAG_FLAT]))
         ],
         'zynq-am2': [
-            (UPGRADE_AM2_SSH, (ARCHIVE_TGZ, []))
+            (UPGRADE_AM2_SSH, (ARCHIVE_TGZ, [])),
+            (UPGRADE_AM2_WEB, (ARCHIVE_TGZ, [ARCHIVE_FLAG_FLAT]))
         ]
     }
 
@@ -1904,7 +1906,7 @@ class Builder:
                                                 'uboot-envtools', 'usr', 'sbin', 'fw_printenv'), 'fw_printenv')
                 if version[0] == self.UPGRADE_AM2:
                     upload_manager.put(os.path.join(build_dir, 'busybox-1.25.1', 'busybox'), 'busybox1.25')
-                if version != self.UPGRADE_AM1_WEB:
+                if version not in (self.UPGRADE_AM1_WEB, self.UPGRADE_AM2_WEB):
                     upload_manager.put(os.path.join(build_dir, 'openssh-without-pam', 'openssh-7.4p1',
                                                     'sftp-server'), 'sftp-server')
             else:
@@ -1925,11 +1927,12 @@ class Builder:
             upload_manager.pop_dir()
 
         # copy upgrade scripts
-        if version == self.UPGRADE_AM1_WEB:
+        if version in (self.UPGRADE_AM1_WEB, self.UPGRADE_AM2_WEB):
             runme = self._get_upgrade_file(self.UPGRADE_AM_RUNME_SRC, version)
             upload_manager.put(runme, self.UPGRADE_AM_RUNME)
-            ubi_info = self._get_upgrade_file(self.UPGRADE_AM_UBI_INFO_SRC, version)
-            upload_manager.put(ubi_info, self.UPGRADE_AM_UBI_INFO)
+            if version == self.UPGRADE_AM1_WEB:
+                ubi_info = self._get_upgrade_file(self.UPGRADE_AM_UBI_INFO_SRC, version)
+                upload_manager.put(ubi_info, self.UPGRADE_AM_UBI_INFO)
         else:
             # copy upgrade modules
             upload_manager.push_dir('upgrade')

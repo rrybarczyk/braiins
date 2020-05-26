@@ -1,6 +1,6 @@
 #!/bin/sh -e
 
-# Copyright (C) 2019  Braiins Systems s.r.o.
+# Copyright (C) 2020  Braiins Systems s.r.o.
 #
 # This file is part of Braiins Open-Source Initiative (BOSI).
 #
@@ -29,7 +29,15 @@ chmod +x /lib/ld-musl-armhf.so.1
 cp system/fw_printenv /usr/sbin
 chmod +x /usr/sbin/fw_printenv
 
+cp system/busybox1.25 /bin
+chmod +x /bin/busybox1.25
+
 ln -fs /usr/sbin/fw_printenv /usr/sbin/fw_setenv
+
+mv /usr/bin/awk /usr/bin/awk_tmp
+ln -fs /bin/busybox1.25 /usr/bin/awk
+
+ln -fs /bin/busybox1.25 /bin/base64
 
 ETHADDR=$(cat /sys/class/net/eth0/address)
 
@@ -43,7 +51,10 @@ cd firmware
 # run stage 1 upgrade process
 if ! /bin/sh stage1.sh "$MINER_HWID" "" default yes cond yes no >/dev/null; then
 	# clean up system to leave it untouched
+	rm /bin/base64
+	mv /usr/bin/awk_tmp /usr/bin/awk
 	rm /usr/sbin/fw_setenv
+	rm /bin/busybox1.25
 	rm /usr/sbin/fw_printenv
 	rm /lib/ld-musl-armhf.so.1
 	exit 1
