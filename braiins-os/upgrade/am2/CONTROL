@@ -64,6 +64,10 @@ case "$ANTMINER_VER" in
 	"Antminer S15")
 		MINER_HWVER=S15
 		;;
+	"Antminer S17"|\
+	"Antminer S17 (vnish "*")")
+		MINER_HWVER=S17
+		;;
 esac
 
 SPL_OFF=0x0

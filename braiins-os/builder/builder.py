@@ -1834,7 +1834,8 @@ class Builder:
             'zynq-dm1-g19': 'G19',
             'zynq-dm1-g29': 'G29',
             'zynq-am1-s9': 'S9',
-            'zynq-am2-s15': 'S15'
+            'zynq-am2-s15': 'S15',
+            'zynq-am2-s17': 'S17'
         }.get(self._config.bos.platform)
         info.write('FW_MINER_HWVER="{}"\n\n'.format(hwver).encode())
 

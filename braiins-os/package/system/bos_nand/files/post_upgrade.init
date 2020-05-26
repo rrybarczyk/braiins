@@ -30,7 +30,8 @@ start() {
 		dm1-g19|\
 		dm1-g29|\
 		am1-s9|\
-		am2-s15)
+		am2-s15|\
+		am2-s17)
 			# update environment when it is not corrupted
 			test -z "$(fw_printenv 2>&1 >/dev/null)" && update_env
 			;;

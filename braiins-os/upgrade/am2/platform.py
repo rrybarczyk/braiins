@@ -51,7 +51,9 @@ FACTORY_MTDPARTS = \
 
 SUPPORTED_IMAGES = [
     # Antminer-S15-user-OM-201912131535-ssh.tar.gz
-    '200654af5ea5f22b479049c5a8269b3d'
+    '200654af5ea5f22b479049c5a8269b3d',
+    # Antminer-S17-user-OM-201912250945-ssh.tar.gz
+    '803b071e515c501fb064ebf826455ead'
 ]
 
 SYSTEM_BINARIES = [

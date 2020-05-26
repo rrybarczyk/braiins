@@ -152,6 +152,9 @@ boot()
 			am2-s15)
 				model="Antminer S15"
 				;;
+			am2-s17)
+				model="Antminer S17"
+				;;
 		esac
 
 		cat > "$CONF" <<-END

@@ -45,7 +45,7 @@ endef
 define Build/Compile
 endef
 
-ifneq (,$(filter am1-s9 am2-s15,$(SUBTARGET)))
+ifneq (,$(filter am1-s9 am2-s15 am2-s17,$(SUBTARGET)))
 define Package/miner_tools/subtarget_install
 	$(CP) ./files/CONFIG.am $(1)/usr/share/upgrade/CONFIG
 endef
