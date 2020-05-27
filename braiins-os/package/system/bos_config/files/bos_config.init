@@ -1,4 +1,6 @@
-# Copyright (C) 2019  Braiins Systems s.r.o.
+#!/bin/sh /etc/rc.common
+
+# Copyright (C) 2020 Braiins Systems s.r.o.
 #
 # This file is part of Braiins Open-Source Initiative (BOSI).
 #
@@ -20,42 +22,36 @@
 # of such proprietary license or if you have any other questions, please
 # contact us at opensource@braiins.com.
 
-include $(TOPDIR)/rules.mk
+START=48
 
-PKG_NAME:=bos_tools
-PKG_RELEASE:=1
+USE_PROCD=1
+CONF=/etc/config/bos
 
-PKG_MAINTAINER:=Braiins <braiins@braiins.com>
+opkg_installed()
+{
+	test -f "/usr/lib/opkg/info/$1.control" && echo yes || echo no
+}
 
-include $(INCLUDE_DIR)/package.mk
+boot()
+{
+	if [ ! -f "$CONF" ]; then
+		local bos_autoupgrade=$(opkg_installed bos_autoupgrade)
+		local bos_tools=$(opkg_installed bos_tools)
 
-define Package/bos_tools
-  SECTION:=utils
-  CATEGORY:=Utilities
-  TITLE:=Utilities for managing braiins OS
-  DEPENDS:=+bos_config
-endef
+		touch "$CONF"
 
-define Package/bos_tools/description
- Add bos script which is used for firmware management.
- It can do factory reset, boot to recovery mode, ...
-endef
+		[ "$bos_autoupgrade" == "yes" ] && uci -q batch <<-EOF
+			set bos.autoupgrade='bos'
+			set bos.autoupgrade.enable='1'
+		EOF
 
-define Build/Compile
-endef
+		[ "$bos_tools" == "yes" ] && uci -q batch <<-EOF
+			set bos.ip_report='bos'
+			set bos.ip_report.enable='1'
+			set bos.ip_report.format='\${IP},\${MAC}'
+		EOF
 
-define Package/bos_tools/conffiles
-/etc/config/bos
-endef
-
-define Package/bos_tools/install
-	$(INSTALL_DIR) $(1)/etc/
-	$(INSTALL_CONF) ./files/factory_cfg.config $(1)/etc
-
-	$(INSTALL_DIR) $(1)/usr/sbin
-	$(INSTALL_BIN) ./files/bos $(1)/usr/sbin/
-	$(INSTALL_BIN) ./files/ip-report.lua $(1)/usr/sbin/ip-report
-	$(INSTALL_BIN) ./files/run-background-process $(1)/usr/sbin/
-endef
-
-$(eval $(call BuildPackage,bos_tools))
+		uci commit bos
+	fi
+	start "$@"
+}

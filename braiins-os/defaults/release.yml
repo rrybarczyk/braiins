@@ -52,6 +52,7 @@ core:
 
 core_tools:
   list:
+    - bos_config
     - bos_tools
     - miner_tools
 

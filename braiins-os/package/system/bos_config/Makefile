@@ -1,4 +1,4 @@
-# Copyright (C) 2019  Braiins Systems s.r.o.
+# Copyright (C) 2020  Braiins Systems s.r.o.
 #
 # This file is part of Braiins Open-Source Initiative (BOSI).
 #
@@ -22,40 +22,35 @@
 
 include $(TOPDIR)/rules.mk
 
-PKG_NAME:=bos_tools
+PKG_NAME:=bos_config
 PKG_RELEASE:=1
 
 PKG_MAINTAINER:=Braiins <braiins@braiins.com>
 
 include $(INCLUDE_DIR)/package.mk
 
-define Package/bos_tools
+define Package/bos_config
   SECTION:=utils
   CATEGORY:=Utilities
-  TITLE:=Utilities for managing braiins OS
-  DEPENDS:=+bos_config
+  TITLE:=Generator of BOS configuration file
 endef
 
-define Package/bos_tools/description
- Add bos script which is used for firmware management.
- It can do factory reset, boot to recovery mode, ...
+define Package/bos_config/description
+ Checks for installed packages and generate default BOS configuration accordingly.
+endef
+
+define Package/bosminer/conffiles
+/etc/config/bos
 endef
 
 define Build/Compile
 endef
 
-define Package/bos_tools/conffiles
-/etc/config/bos
+define Package/bos_config/install
+	$(INSTALL_DIR) $(1)/etc/config
+
+	$(INSTALL_DIR) $(1)/etc/init.d/
+	$(INSTALL_BIN) ./files/bos_config.init $(1)/etc/init.d/bos_config
 endef
 
-define Package/bos_tools/install
-	$(INSTALL_DIR) $(1)/etc/
-	$(INSTALL_CONF) ./files/factory_cfg.config $(1)/etc
-
-	$(INSTALL_DIR) $(1)/usr/sbin
-	$(INSTALL_BIN) ./files/bos $(1)/usr/sbin/
-	$(INSTALL_BIN) ./files/ip-report.lua $(1)/usr/sbin/ip-report
-	$(INSTALL_BIN) ./files/run-background-process $(1)/usr/sbin/
-endef
-
-$(eval $(call BuildPackage,bos_tools))
+$(eval $(call BuildPackage,bos_config))

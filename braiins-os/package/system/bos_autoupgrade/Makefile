@@ -33,7 +33,7 @@ define Package/bos_autoupgrade
   SECTION:=utils
   CATEGORY:=Utilities
   TITLE:=Automatic checking and installation of latest upgrades
-  DEPENDS:=+at +@BUSYBOX_CONFIG_ASH_RANDOM_SUPPORT
+  DEPENDS:=+bos_config +at +@BUSYBOX_CONFIG_ASH_RANDOM_SUPPORT
 endef
 
 define Package/bos_autoupgrade/description
