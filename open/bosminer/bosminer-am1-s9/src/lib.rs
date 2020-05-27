@@ -253,6 +253,7 @@ impl RunningChain {
             .as_ref()
             .expect("BUG: missing flash in voltage controller")
             .checksum
+            .clone()
     }
 
     pub async fn set_frequency(

@@ -422,7 +422,17 @@ impl FlashFreq {
     }
 }
 
-pub type HashboardFlashChecksum = [u8; 32];
+#[derive(Clone)]
+pub struct HashboardFlashChecksum([u8; 32]);
+
+impl std::fmt::Display for HashboardFlashChecksum {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for &b in &self.0[0..6] {
+            write!(f, "{:02x}", b)?;
+        }
+        Ok(())
+    }
+}
 
 pub struct HashboardFlash {
     pub badcore_flash: Option<FlashBadcore>,
@@ -709,9 +719,10 @@ impl Control {
             .await?;
         let freq_flash_data = self.read_flash(FlashFreq::START, FlashFreq::LEN).await?;
 
-        let checksum =
+        let checksum = HashboardFlashChecksum(
             sha256::Hash::hash(&([&badcore_flash_data[..], &freq_flash_data[..]].concat()))
-                .into_inner();
+                .into_inner(),
+        );
         *self.flash.lock().await = Some(HashboardFlash {
             checksum,
             badcore_flash: FlashBadcore::parse(&badcore_flash_data),
