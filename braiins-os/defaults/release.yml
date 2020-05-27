@@ -67,8 +67,7 @@ firmware_upgrade:
   list:
     - at
     - libelf1
-    - bos_update
-    - bos_monitor
+    - bos_autoupgrade
 
 # image package lists
 image_sd:

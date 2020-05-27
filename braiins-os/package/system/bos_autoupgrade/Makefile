@@ -1,4 +1,4 @@
-# Copyright (C) 2019  Braiins Systems s.r.o.
+# Copyright (C) 2020  Braiins Systems s.r.o.
 #
 # This file is part of Braiins Open-Source Initiative (BOSI).
 #
@@ -22,36 +22,54 @@
 
 include $(TOPDIR)/rules.mk
 
-PKG_NAME:=bos_monitor
+PKG_NAME:=bos_autoupgrade
 PKG_RELEASE:=1
 
 PKG_MAINTAINER:=Braiins <braiins@braiins.com>
 
 include $(INCLUDE_DIR)/package.mk
 
-define Package/bos_monitor
+define Package/bos_autoupgrade
   SECTION:=utils
   CATEGORY:=Utilities
-  TITLE:=Utilities for monitoring braiins OS
-  DEPENDS:=+@BUSYBOX_CONFIG_INOTIFYD
+  TITLE:=Automatic checking and installation of latest upgrades
+  DEPENDS:=+at +@BUSYBOX_CONFIG_ASH_RANDOM_SUPPORT
 endef
 
-define Package/bos_monitor/description
- Periodically checks for new firmware updates and print notification.
+define Package/bos_autoupgrade/description
+ Periodically calls opkg update to get latest packages.
 endef
 
 define Build/Compile
 endef
 
-define Package/bos_monitor/install
+define Package/bos_autoupgrade/install
+	$(INSTALL_DIR) $(1)/etc/crontabs
+
 	$(INSTALL_DIR) $(1)/usr/sbin/
-	$(INSTALL_BIN) ./files/bos_monitor.sh $(1)/usr/sbin/
+	$(INSTALL_BIN) ./files/bos_update_at.sh $(1)/usr/sbin/bos_update_at
+
+	$(INSTALL_DIR) $(1)/usr/sbin/
+	$(INSTALL_BIN) ./files/bos_autoupgrade.sh $(1)/usr/sbin/bos_autoupgrade
 
 	$(INSTALL_DIR) $(1)/etc/init.d/
-	$(INSTALL_BIN) ./files/bos_monitor.init $(1)/etc/init.d/bos_monitor
+	$(INSTALL_BIN) ./files/bos_autoupgrade.init $(1)/etc/init.d/bos_autoupgrade
 
 	$(INSTALL_DIR) $(1)/etc/profile.d/
-	$(INSTALL_BIN) ./files/bos_monitor.profile $(1)/etc/profile.d/bos_monitor.sh
+	$(INSTALL_BIN) ./files/bos_autoupgrade.profile $(1)/etc/profile.d/bos_autoupgrade.sh
 endef
 
-$(eval $(call BuildPackage,bos_monitor))
+define Package/bos_autoupgrade/preinst
+#!/bin/sh
+
+echo "0 0 * * * /usr/sbin/bos_update_at 2>&1 | logger -t update" >> $${IPKG_INSTROOT}/etc/crontabs/root
+endef
+
+define Package/bos_autoupgrade/postrm
+#!/bin/sh
+
+sed -i '/usr/sbin/bos_update_at/d' /etc/crontabs/root
+/etc/init.d/cron restart
+endef
+
+$(eval $(call BuildPackage,bos_autoupgrade))
