@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Copyright (C) 2019  Braiins Systems s.r.o.
+# Copyright (C) 2020  Braiins Systems s.r.o.
 #
 # This file is part of Braiins Open-Source Initiative (BOSI).
 #
@@ -26,10 +26,11 @@
 set -e
 
 usage() {
-	echo "usage: bos [-h] {factory_reset,get_factory_cfg,run_recovery,ip_report,nightly_feeds} ..."
+	echo "usage: bos [-h] {upgrade,factory_reset,get_factory_cfg,run_recovery,ip_report,nightly_feeds} ..."
 	echo
 	echo "positional arguments:"
-	echo "  {factory_reset,get_factory_cfg,run_recovery,ip_report,nightly_feeds}"
+	echo "  {upgrade,factory_reset,get_factory_cfg,run_recovery,ip_report,nightly_feeds}"
+	echo "    upgrade             upgrade system to the latest firmware"
 	echo "    factory_reset       reboot and initiate factory reset"
 	echo "    get_factory_cfg     get factory configuration for specified attribute"
 	echo "    run_recovery        reboot to recovery mode"
@@ -38,6 +39,32 @@ usage() {
 	echo
 	echo "optional arguments:"
 	echo "  -h, --help            show this help message and exit"
+}
+
+upgrade() {
+	if [ $# -gt 1 -o \( $# -eq 1 -a "$1" != 'auto' \) ]; then
+		echo "command 'upgrade' takes only one argument 'auto' or none" >&2
+		exit 1
+	fi
+
+	echo "Starting check for new firmware upgrade..." >&2
+	opkg update 2>&1 || true
+	# wait some time to check for new upgrades in 'inotifyd' script
+	sleep 1
+	local fw_transition=$(cat "/tmp/bos_upgrade" 2>/dev/null)
+	if [ -n "$fw_transition" ]; then
+		echo "New firmware upgrade was found!" >&2
+		echo "$fw_transition" >&2
+		# check configuration if auto-upgrade is enabled
+		if [ "$1" != "auto" -o "$(uci -q get bos.autoupgrade.enable || echo 0)" == '1' ]; then
+			echo "Running firmware upgrade..." >&2
+			opkg install firmware 2>&1
+		else
+			echo "Auto-upgrade is disabled, skipping firmware upgrade!" >&2
+		fi
+	else
+		echo "No new firmware upgrade was found!" >&2
+	fi
 }
 
 factory_reset() {
@@ -181,7 +208,7 @@ fi
 command="$1"
 
 case $command in
-	factory_reset|get_factory_cfg|run_recovery|ip_report|nightly_feeds)
+	upgrade|factory_reset|get_factory_cfg|run_recovery|ip_report|nightly_feeds)
 		shift
 		$command "$@"
 	;;

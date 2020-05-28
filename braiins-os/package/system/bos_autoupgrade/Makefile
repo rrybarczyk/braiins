@@ -47,7 +47,7 @@ define Package/bos_autoupgrade/install
 	$(INSTALL_DIR) $(1)/etc/crontabs
 
 	$(INSTALL_DIR) $(1)/usr/sbin/
-	$(INSTALL_BIN) ./files/bos_update_at.sh $(1)/usr/sbin/bos_update_at
+	$(INSTALL_BIN) ./files/bos_upgrade_at.sh $(1)/usr/sbin/bos_upgrade_at
 
 	$(INSTALL_DIR) $(1)/usr/sbin/
 	$(INSTALL_BIN) ./files/bos_autoupgrade.sh $(1)/usr/sbin/bos_autoupgrade
@@ -62,13 +62,13 @@ endef
 define Package/bos_autoupgrade/preinst
 #!/bin/sh
 
-echo "0 0 * * * /usr/sbin/bos_update_at 2>&1 | logger -t update" >> $${IPKG_INSTROOT}/etc/crontabs/root
+echo "0 0 * * * /usr/sbin/bos_upgrade_at 2>&1 | logger -t upgrade" >> $${IPKG_INSTROOT}/etc/crontabs/root
 endef
 
 define Package/bos_autoupgrade/postrm
 #!/bin/sh
 
-sed -i '/usr/sbin/bos_update_at/d' /etc/crontabs/root
+sed -i '/usr/sbin/bos_upgrade_at/d' /etc/crontabs/root
 /etc/init.d/cron restart
 endef
 

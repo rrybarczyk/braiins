@@ -28,10 +28,11 @@
 set -e
 
 usage() {
-	echo "usage: miner [-h] {factory_reset,get_factory_cfg,run_recovery,ip_report,nightly_feeds,fault_light,nand_install} ..."
+	echo "usage: miner [-h] {upgrade,factory_reset,get_factory_cfg,run_recovery,ip_report,nightly_feeds,fault_light,nand_install} ..."
 	echo
 	echo "positional arguments:"
-	echo "  {factory_reset,get_factory_cfg,run_recovery,ip_report,nightly_feeds,fault_light,nand_install}"
+	echo "  {upgrade,factory_reset,get_factory_cfg,run_recovery,ip_report,nightly_feeds,fault_light,nand_install}"
+	echo "    upgrade             upgrade system to the latest firmware"
 	echo "    factory_reset       reboot and initiate factory reset"
 	echo "    get_factory_cfg     get factory configuration for specified attribute"
 	echo "    run_recovery        reboot to recovery mode"
@@ -42,6 +43,10 @@ usage() {
 	echo
 	echo "optional arguments:"
 	echo "  -h, --help            show this help message and exit"
+}
+
+upgrade() {
+	exec bos upgrade "$@"
 }
 
 factory_reset() {
@@ -152,7 +157,7 @@ fi
 command="$1"
 
 case $command in
-	factory_reset|get_factory_cfg|run_recovery|ip_report|nightly_feeds|\
+	upgrade|factory_reset|get_factory_cfg|run_recovery|ip_report|nightly_feeds|\
 	fault_light|nand_install)
 		shift
 		$command "$@"

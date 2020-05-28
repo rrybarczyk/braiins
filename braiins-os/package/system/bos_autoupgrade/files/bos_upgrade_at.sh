@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Copyright (C) 2019  Braiins Systems s.r.o.
+# Copyright (C) 2020  Braiins Systems s.r.o.
 #
 # This file is part of Braiins Open-Source Initiative (BOSI).
 #
@@ -22,13 +22,13 @@
 # of such proprietary license or if you have any other questions, please
 # contact us at opensource@braiins.com.
 
-echo "Schedule times for opkg update:"
+echo "Schedule times for bos auto-upgrade..." | logger -st upgrade
 
 offset=$(($RANDOM % 240))
 
 while [ $offset -lt 1440 ]; do
 	(at now + $offset minutes 2>&1 | sed -n '/job/s/job [[:digit:]]\+ at //p') <<-END
-		opkg update 2>&1 | logger -t opkg
+		bos upgrade auto 2>&1 | logger -t upgrade
 	END
 	offset=$(($RANDOM % 120 + $offset + 480))
-done
+done | logger -st upgrade
