@@ -145,6 +145,8 @@ pub struct TunerChainStatus {
     pub approx_consumption: u32,
     #[serde(rename = "TunerRunning")]
     pub tuner_running: bool,
+    #[serde(rename = "LoadedProfileFrom")]
+    pub loaded_profile_from: Option<Time>,
 }
 
 /// Basic temperature control settings
