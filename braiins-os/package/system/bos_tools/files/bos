@@ -152,13 +152,6 @@ ip_report() {
 	/usr/sbin/ip-report
 }
 
-#nightly_feeds_status() {
-#	local record="$1"
-#	awk \
-#		'BEGIN {res="off"} /^[^#]/ && $2 ~ /^'"$record"'$/ {res="on " FILENAME} END {print res}' \
-#		/etc/opkg/*.conf
-#}
-
 list_enabled_feeds() {
 	local record="$1"
 	awk '/^[^#]/ && $2 == "'"$record"'" {print FILENAME; nextfile}' /etc/opkg/*.conf
@@ -192,7 +185,7 @@ nightly_feeds() {
 					exit 1
 				fi
 				sed -i 's/^[#]\+[ ]*\([^ ]\+ '"$record"' .*\)/\1/' "$file"
-				echo "Enabling nightly record '$record' in '$file'"
+				echo "Enabling nightly record '$record' in '$file'" >&2
 			fi
 		;;
 		off)
@@ -203,7 +196,7 @@ nightly_feeds() {
 				# comment all enabled feed records
 				while IFS= read -r file; do
 					sed -i 's/\(^[^ ]\+ '"$record"' .*\)/# \1/' "$file"
-					echo "Disabling nightly record '$record' in '$file'"
+					echo "Disabling nightly record '$record' in '$file'" >&2
 					disabled="yes"
 				done
 			fi
