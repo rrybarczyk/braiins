@@ -67,6 +67,7 @@ endef
 
 define Package/bosminer/conffiles
 /etc/bosminer.toml
+/etc/bosminer-autotune.json
 endef
 
 define Build/Compile
