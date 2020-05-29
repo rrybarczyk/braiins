@@ -41,8 +41,8 @@ boot()
 		touch "$CONF"
 
 		[ "$bos_autoupgrade" == "yes" ] && uci -q batch <<-EOF
-			set bos.autoupgrade='bos'
-			set bos.autoupgrade.enable='1'
+			set bos.auto_upgrade='bos'
+			set bos.auto_upgrade.enable='1'
 		EOF
 
 		[ "$bos_tools" == "yes" ] && uci -q batch <<-EOF

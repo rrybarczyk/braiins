@@ -22,14 +22,17 @@
 # of such proprietary license or if you have any other questions, please
 # contact us at opensource@braiins.com.
 
+. /lib/functions/bos-defaults.sh
+
 # immediately exit when error occurs
 set -e
 
 usage() {
-	echo "usage: bos [-h] {upgrade,factory_reset,get_factory_cfg,run_recovery,ip_report,nightly_feeds} ..."
+	echo "usage: bos [-h] {auto_upgrade,upgrade,factory_reset,get_factory_cfg,run_recovery,ip_report,nightly_feeds} ..."
 	echo
 	echo "positional arguments:"
-	echo "  {upgrade,factory_reset,get_factory_cfg,run_recovery,ip_report,nightly_feeds}"
+	echo "  {auto_upgrade,upgrade,factory_reset,get_factory_cfg,run_recovery,ip_report,nightly_feeds}"
+	echo "    auto_upgrade        turn on or off auto-upgrade to the latest firmware"
 	echo "    upgrade             upgrade system to the latest firmware"
 	echo "    factory_reset       reboot and initiate factory reset"
 	echo "    get_factory_cfg     get factory configuration for specified attribute"
@@ -39,6 +42,19 @@ usage() {
 	echo
 	echo "optional arguments:"
 	echo "  -h, --help            show this help message and exit"
+}
+
+auto_upgrade_status() {
+	local au_enable=$(uci -q get bos.auto_upgrade.enable || echo 0)
+	[ $au_enable -eq '1' ] && echo "on" || echo "off"
+}
+
+auto_upgrade_set() {
+	uci -q batch <<-EOF
+		set bos.auto_upgrade='bos'
+		set bos.auto_upgrade.enable='$1'
+		commit bos
+	EOF
 }
 
 upgrade() {
@@ -56,7 +72,7 @@ upgrade() {
 		echo "New firmware upgrade was found!" >&2
 		echo "$fw_transition" >&2
 		# check configuration if auto-upgrade is enabled
-		if [ "$1" != "auto" -o "$(uci -q get bos.autoupgrade.enable || echo 0)" == '1' ]; then
+		if [ "$1" != "auto" -o "$(auto_upgrade_status)" == "on" ]; then
 			echo "Running firmware upgrade..." >&2
 			opkg install firmware 2>&1
 		else
@@ -198,6 +214,38 @@ nightly_feeds() {
 	esac
 }
 
+auto_upgrade() {
+	if [ $# -gt 1 -o \( $# -eq 1 -a "$1" != 'on' -a "$1" != 'off' \) ]; then
+		echo "command 'auto_upgrade' takes only one argument [on|off] or none" >&2
+		exit 1
+	fi
+	if [ $BOS_MODE != 'nand' ]; then
+		echo "Auto-upgrade feature is not supported in '$BOS_MODE' mode!" >&2
+		exit 1
+	fi
+	case $1 in
+		on)
+			if [ $(auto_upgrade_status) == "on" ]; then
+				echo "Auto-upgrade is already enabled!" >&2
+			else
+				echo "Enabling auto-upgrade" >&2
+				auto_upgrade_set '1'
+			fi
+		;;
+		off)
+			if [ $(auto_upgrade_status) == "off" ]; then
+				echo "Auto-upgrade is already disabled!" >&2
+			else
+				echo "Disabling auto-upgrade" >&2
+				auto_upgrade_set '0'
+			fi
+		;;
+		*)
+			auto_upgrade_status
+		;;
+	esac
+}
+
 # check number of arguments
 if [ $# -lt 1 ]; then
 	echo "missing command argument" >&2
@@ -208,7 +256,7 @@ fi
 command="$1"
 
 case $command in
-	upgrade|factory_reset|get_factory_cfg|run_recovery|ip_report|nightly_feeds)
+	auto_upgrade|upgrade|factory_reset|get_factory_cfg|run_recovery|ip_report|nightly_feeds)
 		shift
 		$command "$@"
 	;;
