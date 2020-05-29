@@ -189,15 +189,16 @@ def install(args, host, username, password, stage3_user_path, stage3_builtin_pat
         pool_user = args.pool_user or ''
         keep_network = 'no' if args.no_keep_network else 'yes'
         keep_pools = 'no' if args.no_keep_pools else 'yes'
+        auto_upgrade = 'no' if args.no_auto_upgrade else 'yes'
         dry_run = 'yes' if args.dry_run else 'no'
 
         # run stage1 upgrade process
         try:
             print("Upgrading firmware...")
             stdout, _ = ssh.run('cd', TARGET_DIR, '&&', 'ls', '-l', '&&',
-                                "/bin/sh stage1.sh '{}' '{}' '{}' '{}' '{}' '{}' '{}'"
+                                "/bin/sh stage1.sh '{}' '{}' '{}' '{}' '{}' '{}' '{}' '{}'"
                                 .format(hw_id, pool_user, psu_power_limit, keep_network, keep_hostname, keep_pools,
-                                        dry_run))
+                                        auto_upgrade, dry_run))
         except subprocess.CalledProcessError as error:
             cleanup_system(ssh)
             print()
@@ -256,6 +257,8 @@ def build_arg_parser(parser):
                         help='path to file with list of hosts to install to')
     parser.add_argument('--backup', action='store_true',
                         help='do miner backup before upgrade')
+    parser.add_argument('--no-auto-upgrade', action='store_true',
+                        help='turn off auto-upgrade of installed firmware')
     parser.add_argument('--no-nand-backup', action='store_true',
                         help='skip full NAND backup (config is still being backed up)')
     parser.add_argument('--pool-user', nargs='?',

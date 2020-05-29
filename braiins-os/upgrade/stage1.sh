@@ -22,7 +22,7 @@
 # of such proprietary license or if you have any other questions, please
 # contact us at opensource@braiins.com.
 
-if [ "$#" -ne 7 ]; then
+if [ "$#" -ne 8 ]; then
 	echo "Illegal number of parameters" >&2
 	exit 1
 fi
@@ -35,7 +35,8 @@ MINER_PSU_POWER_LIMIT="$3"
 KEEP_NET_CONFIG="$4"
 KEEP_HOSTNAME="$5"
 KEEP_POOLS="$6"
-DRY_RUN="$7"
+AUTO_UPGRADE="$7"
+DRY_RUN="$8"
 
 UBOOT_ENV_CFG="uboot_env.config"
 
