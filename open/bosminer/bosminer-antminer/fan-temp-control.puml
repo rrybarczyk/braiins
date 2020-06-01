@@ -44,8 +44,13 @@ else
 			:Shutdown;
 			detach
 		elseif (Sensors have unknown value) then (yes)
-			:FAN = 100%;
-			detach
+			if (All chains stopped) then (yes)
+				:FAN = 0%;
+				detach
+			else (no)
+				:FAN = 100%;
+				detach
+			endif
 		else (no)
 			if (Dangerous temperature) then (yes)
 				:Shutdown;
