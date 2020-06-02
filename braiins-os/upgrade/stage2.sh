@@ -34,7 +34,7 @@ echo "Running stage2 upgrade process..."
 
 # dump all network and miner settings
 fw_printenv 2> /dev/null \
-| grep '^ethaddr\|^net_\|^miner_' > "$DEVICE_CFG"
+| grep '^ethaddr\|^net_\|^bos_\|^miner_' > "$DEVICE_CFG"
 
 # turn off error checking for auxiliary settings
 set +e

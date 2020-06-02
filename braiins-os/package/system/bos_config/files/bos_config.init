@@ -27,6 +27,14 @@ START=48
 USE_PROCD=1
 CONF=/etc/config/bos
 
+. /lib/functions/bos-defaults.sh
+
+get_env_config()
+{
+	# if NAND is available, get default pool configuration from U-Boot env
+	[ "$BOS_MODE" == "nand" ] && fw_printenv -n $1 2>/dev/null || echo ""
+}
+
 opkg_installed()
 {
 	test -f "/usr/lib/opkg/info/$1.control" && echo yes || echo no
@@ -38,11 +46,13 @@ boot()
 		local bos_autoupgrade=$(opkg_installed bos_autoupgrade)
 		local bos_tools=$(opkg_installed bos_tools)
 
+		local auto_upgrade_enable=$(get_env_config bos_auto_upgrade_enable)
+
 		touch "$CONF"
 
 		[ "$bos_autoupgrade" == "yes" ] && uci -q batch <<-EOF
 			set bos.auto_upgrade='bos'
-			set bos.auto_upgrade.enable='1'
+			set bos.auto_upgrade.enable=${auto_upgrade_enable:-0}
 		EOF
 
 		[ "$bos_tools" == "yes" ] && uci -q batch <<-EOF

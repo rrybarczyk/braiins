@@ -133,6 +133,9 @@ fi
 
 echo "U-Boot configuration..."
 
+BOS_AUTO_UPGRADE_ENABLE='0'
+[ x"$AUTO_UPGRADE" == x"yes" ] && BOS_AUTO_UPGRADE_ENABLE='1'
+
 [ x"$KEEP_POOLS" == x"yes" ] || MINER_POOL_COUNT=
 
 # set pool count to zero when it is not set
@@ -159,6 +162,9 @@ fw_setenv -c "$UBOOT_ENV_CFG" --script - <<-EOF
 	#
 	ethaddr ${ETHADDR}
 	#
+	# set bos configuration
+	#
+	bos_auto_upgrade_enable ${BOS_AUTO_UPGRADE_ENABLE}
 	# set miner configuration
 	miner_hwid ${MINER_HWID}
 	miner_pool_user ${MINER_POOL_USER}
