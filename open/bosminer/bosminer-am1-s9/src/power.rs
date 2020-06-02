@@ -423,7 +423,7 @@ impl FlashFreq {
 }
 
 #[derive(Clone)]
-pub struct HashboardFlashChecksum([u8; 32]);
+pub struct HashboardFlashChecksum(pub [u8; 32]);
 
 impl std::fmt::Display for HashboardFlashChecksum {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
