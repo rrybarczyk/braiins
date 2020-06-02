@@ -618,9 +618,10 @@ impl HashChain {
                 .await?;
         } else {
             // Update chips one-by-one
+            let old_frequency = self.frequency.lock().await.clone();
             for i in 0..self.chip_count {
-                let new_freq = self.frequency.lock().await.chip[i];
-                if new_freq != frequency.chip[i] {
+                let new_freq = frequency.chip[i];
+                if new_freq != old_frequency.chip[i] {
                     self.set_chip_pll(ChipAddress::One(i), new_freq).await?;
                 }
             }
