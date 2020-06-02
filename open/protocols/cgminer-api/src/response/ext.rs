@@ -150,6 +150,14 @@ pub struct TunerChainStatus {
     pub loaded_profile_created_on: Option<Time>,
 }
 
+#[derive(Serialize, PartialEq, Clone, Debug)]
+pub enum DynamicPowerScaling {
+    Disabled,
+    InitialPowerLimit,
+    ScaledPowerLimit(u32),
+    CoolingDownFor(Time),
+}
+
 /// Basic temperature control settings
 #[derive(Serialize, PartialEq, Clone, Debug)]
 pub struct TunerStatus {
@@ -161,6 +169,8 @@ pub struct TunerStatus {
     pub approx_miner_consumption: u32,
     #[serde(rename = "TunerChainStatus")]
     pub chains: Vec<TunerChainStatus>,
+    #[serde(rename = "DynamicPowerScaling")]
+    pub dynamic_power_scaling: DynamicPowerScaling,
 }
 
 impl From<TunerStatus> for Dispatch {
