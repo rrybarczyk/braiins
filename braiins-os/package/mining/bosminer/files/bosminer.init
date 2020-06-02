@@ -33,7 +33,7 @@ CONF=/etc/bosminer.toml
 get_env_config()
 {
 	# if NAND is available, get default pool configuration from U-Boot env
-	[ "$bos_mode" == "nand" ] && fw_printenv -n $1 2>/dev/null || echo ""
+	[ "$BOS_MODE" == "nand" ] && fw_printenv -n $1 2>/dev/null || echo ""
 }
 
 begins_with() {
@@ -109,7 +109,6 @@ generate_pools() {
 boot()
 {
 	if [ ! -f "$CONF" ]; then
-		local bos_mode=$(cat /etc/bos_mode)
 		local pool_host=$(get_env_config miner_pool_host)
 		local pool_port=$(get_env_config miner_pool_port)
 		local pool_path=$(get_env_config miner_pool_path)
