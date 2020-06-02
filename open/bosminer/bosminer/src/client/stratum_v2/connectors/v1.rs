@@ -63,7 +63,7 @@ impl Connector {
         self,
         connection: TcpStream,
     ) -> error::Result<(v2::DynFramedSink, v2::DynFramedStream)> {
-        trace!("Stratum V2 noise connector: {:?}, {:?}", connection, self);
+        trace!("Stratum V1 connector: {:?}, {:?}", connection, self);
 
         let v1_framed_connection = ii_wire::Connection::<v1::Framing>::new(connection).into_inner();
 
