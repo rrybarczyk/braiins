@@ -50,6 +50,7 @@ if ![file exists $results_dir] {file mkdir $results_dir}
 source generate_ip_axi_bm13xx.tcl
 source generate_ip_axi_board_ctrl.tcl
 source generate_ip_axi_fan_ctrl.tcl
+source generate_ip_axi_glitch_monitor.tcl
 
 ####################################################################################################
 # Add IP Repositories to search path

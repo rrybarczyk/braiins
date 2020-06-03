@@ -61,7 +61,7 @@ set_property -dict { PACKAGE_PIN R17 IOSTANDARD LVCMOS33 } [get_ports { gpio_1_t
 ####################################################################################################
 # Pin assignment for fans
 ####################################################################################################
-set_property -dict {PACKAGE_PIN J18  IOSTANDARD LVCMOS33  DRIVE 16} [get_ports {pwm}];  # {FAN1 .. FAN6}.PWM
+set_property -dict {PACKAGE_PIN J18  IOSTANDARD LVCMOS33  DRIVE 16} [get_ports {pwm[0]}];  # {FAN1 .. FAN6}.PWM
 
 set_property -dict {PACKAGE_PIN G17  IOSTANDARD LVCMOS33  PULLUP true} [get_ports {fan_sense[0]}];  # FAN1.SENSE
 set_property -dict {PACKAGE_PIN H20  IOSTANDARD LVCMOS33  PULLUP true} [get_ports {fan_sense[1]}];  # FAN2.SENSE
@@ -69,8 +69,8 @@ set_property -dict {PACKAGE_PIN H20  IOSTANDARD LVCMOS33  PULLUP true} [get_port
 ####################################################################################################
 # Pin assignment for I2C
 ####################################################################################################
-set_property -dict { PACKAGE_PIN W18 IOSTANDARD LVCMOS33 PULLUP true  DRIVE 16 } [get_ports { iic_0_scl_io }];  # S9: Jx_4, TSCL
-set_property -dict { PACKAGE_PIN W19 IOSTANDARD LVCMOS33 PULLUP true  DRIVE 16 } [get_ports { iic_0_sda_io }];  # S9: Jx_3, TSDA
+set_property -dict { PACKAGE_PIN W18 IOSTANDARD LVCMOS33 PULLUP true  DRIVE 16 } [get_ports { iic_hb_scl_io }];  # S9: Jx_4, TSCL
+set_property -dict { PACKAGE_PIN W19 IOSTANDARD LVCMOS33 PULLUP true  DRIVE 16 } [get_ports { iic_hb_sda_io }];  # S9: Jx_3, TSDA
 
 
 ####################################################################################################

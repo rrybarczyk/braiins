@@ -63,7 +63,6 @@ create_peripheral ${ip_vendor} ${ip_library} ${ip_name} ${ip_version} -dir $ip_r
 set ip_core [ipx::find_open_core $ip_id]
 
 add_peripheral_interface S_AXI -interface_mode slave -axi_type lite $ip_core
-set_property VALUE 5 [ipx::get_bus_parameters WIZ_NUM_REG -of_objects [ipx::get_bus_interfaces S_AXI -of_objects $ip_core]]
 generate_peripheral -driver -bfm_example_design -debug_hw_example_design $ip_core
 write_peripheral $ip_core
 
@@ -85,6 +84,11 @@ set_property description "Fan Controller IP core" [ipx::current_core]
 set_property company_url "http://www.braiins.com" [ipx::current_core]
 set_property supported_families "zynq Production" [ipx::current_core]
 
+# Set correct width of AXI address
+set_property value 5 [ipx::get_user_parameters C_S_AXI_ADDR_WIDTH -of_objects [ipx::current_core]]
+set_property value 5 [ipx::get_hdl_parameters C_S_AXI_ADDR_WIDTH -of_objects [ipx::current_core]]
+
+# Creates file groups
 set vhdl_synth_group [ipx::get_file_groups xilinx_vhdlsynthesis -of_objects [ipx::current_core]]
 set vhdl_sim_group [ipx::get_file_groups xilinx_vhdlbehavioralsimulation -of_objects [ipx::current_core]]
 

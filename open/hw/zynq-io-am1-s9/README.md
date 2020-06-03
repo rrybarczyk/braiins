@@ -20,6 +20,7 @@ FPGA design contains following IP cores:
 - axi_iic - standard Xilinx I2C module (1x)
 - axi_fan_ctrl - custom IP core for PWM generation and fan speed monitoring (1x)
 - axi_bm13xx - custom IP core for communication with hashing chips BM1387, BM1391, BM1393 and BM1397 (3x)
+- axi_glitch_monitor - custom IP core for glitch monitoring on input signals (1x)
 
 | Name of IP         | Type of IP                      | Base address | Range  | IRQ             | Frequency [MHz] |
 | ------------------ | ------------------------------- | :----------: | :----: | :-------------: | :-------------: |
@@ -30,6 +31,7 @@ FPGA design contains following IP cores:
 | axi_bm13xx_0       | Braiins AXI BM13xx v1.0         | 0x43C00000   | 64kB   | true (62..64)   | 50              |
 | axi_bm13xx_1       | Braiins AXI BM13xx v1.0         | 0x43C10000   | 64kB   | true (65..67)   | 50              |
 | axi_bm13xx_2       | Braiins AXI BM13xx v1.0         | 0x43C20000   | 64kB   | true (68,84,85) | 50              |
+| axi_glitch_monitor | Braiins AXI Glitch Monitor v1.0 | 0x43D00000   | 64kB   | false           | 50              |
 
 UART interfaces of AXI BM13xx IP cores are connected to connectors J6..J8.
 
@@ -44,6 +46,7 @@ FPGA design contains following IP cores:
 - axi_fan_ctrl - custom IP core for PWM generation and fan speed monitoring (1x)
 - axi_board_ctrl - custom IP core for configuration board pinout of various version of control boards (1x)
 - axi_bm13xx - custom IP core for communication with hashing chips BM1387, BM1391, BM1393 and BM1397 (4x)
+- axi_glitch_monitor - custom IP core for glitch monitoring on input signals (1x)
 
 | Name of IP         | Type of IP                        | Base address | Range  | IRQ             | Frequency [MHz] |
 | ------------------ | --------------------------------- | :----------: | :----: | :-------------: | :-------------: |
@@ -57,6 +60,7 @@ FPGA design contains following IP cores:
 | axi_bm13xx_1       | Braiins AXI BM13xx v1.0           | 0x43C10000   | 64kB   | true (65..67)   | 50              |
 | axi_bm13xx_2       | Braiins AXI BM13xx v1.0           | 0x43C20000   | 64kB   | true (68,84,85) | 50              |
 | axi_bm13xx_3       | Braiins AXI BM13xx v1.0           | 0x43C30000   | 64kB   | true (86..88)   | 50              |
+| axi_glitch_monitor | Braiins AXI Glitch Monitor v1.0   | 0x43D00000   | 64kB   | false           | 50              |
 
 AXI BM13xx IP cores are connected to connectors J1..J4.
 
@@ -523,6 +527,72 @@ Item Board Type Select support the following values:
 
 Other values are invalid and the design is configured in minimum operating state (equivalent to configuration for C47 board).
 Also the bit BOARD_SEL_VALID in status register is set to 0.
+
+
+# Glitch Monitor IP Core Description
+
+Glitch Monitor IP core provides basic monitoring of glitches on input ports.
+IP core reports number of glitches and width of the last glitch.
+The design detects pulses from 20ns to 140ns (7 clocks @ 50MHz) and supports up to 14 input ports.
+
+## IP Core AXI Interface
+Address map of registers available through AXI interface:
+
+| Address | Name             | Access | Reset Value | Description                     |
+| :-----: | ---------------- | :----: | :---------: | ------------------------------- |
+| 0x0000  | CTRL_REG         | RW     | 0x00        | Control Register                |
+| 0x0004  | reserved         | RW     | 0x00        | Reserved                        |
+| 0x0008  | reserved         | RW     | 0x00        | Reserved                        |
+| 0x000C  | reserved         | RW     | 0x00        | Reserved                        |
+| 0x0010  | CH0_CNT          | R      | 0x00        | Channel 0 Glitch Counter        |
+| 0x0014  | CH0_WIDTH        | R      | 0x00        | Channel 0 Last Glitch Width     |
+| 0x0018  | CH1_CNT          | R      | 0x00        | Channel 1 Glitch Counter        |
+| 0x001C  | CH1_WIDTH        | R      | 0x00        | Channel 1 Last Glitch Width     |
+| ...     | ...              | ...    | ...         | ...                             |
+| 0x0078  | CH13_CNT         | R      | 0x00        | Channel 13 Glitch Counter       |
+| 0x007C  | CH13_WIDTH       | R      | 0x00        | Channel 13 Last Glitch Width    |
+
+### Control Register (CTRL_REG)
+Control register provides common configuration of the IP core. Register contains following bits:
+
+| Bits  | Name             | Access | Reset Value | Description                       |
+| :---: | ---------------- | :----: | :---------: | --------------------------------- |
+| 0     | CNT_CLEAR        | W      | 0           | Clear all counters                |
+
+Write value 1 into register CTRL_REG.CNT_CLEAR clears all counters and set width of the last glitch to zero.
+
+### Glitch Counter Registers (CHx_CNT)
+Registers provide information about number of glitches for each input port.
+Registers are 32-bit width. Registers are read-only.
+
+### Last Glitch Width Registers (CHx_WIDTH)
+Registers provide information about width of the last detected glitch for each input port.
+Value of the width is in AXI clocks (20ns).
+Registers are 32-bit width but only 3 LSBs are used. Registers are read-only.
+
+### Tracked Input Ports
+In design for Antminer S9 the following input ports are monitored:
+
+| Channel | Port             | Counter Address | Width Address |
+| :-----: | ---------------- | :-------------: | :-----------: |
+| 0       | I2C_HB.SCL       | 0x10            | 0x14          |
+| 1       | I2C_HB.SDA       | 0x18            | 0x1C          |
+| 2       | J6.RxD           | 0x20            | 0x24          |
+| 3       | J7.RxD           | 0x28            | 0x2C          |
+| 4       | J8.RxD           | 0x30            | 0x34          |
+
+In designs for others Antminers (S15, ...) the following input ports are monitored:
+
+| Channel | Port             | Counter Address | Width Address |
+| :-----: | ---------------- | :-------------: | :-----------: |
+| 0       | I2C_HB.SCL       | 0x10            | 0x14          |
+| 1       | I2C_HB.SDA       | 0x18            | 0x1C          |
+| 2       | J1.RxD           | 0x20            | 0x24          |
+| 3       | J2.RxD           | 0x28            | 0x2C          |
+| 4       | J3.RxD           | 0x30            | 0x34          |
+| 5       | J4.RxD           | 0x38            | 0x3C          |
+
+Others channels are unconnected and reserved for future use.
 
 
 # Synthesis and Verification
