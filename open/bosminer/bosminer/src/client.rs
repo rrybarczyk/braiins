@@ -92,7 +92,8 @@ impl Handle {
                     "BUG: protocol 'Stratum V1' does not support channel"
                 );
                 let extranonce_subscribe = descriptor.detect_xnsub();
-                let v1_connector = stratum_v2::connectors::v1::Connector::new(extranonce_subscribe);
+                let v1_connector =
+                    stratum_v2::connectors::v1::Connector::new(extranonce_subscribe, None);
                 Arc::new(stratum_v2::StratumClient::new(
                     stratum_v2::ConnectionDetails::from_descriptor(&descriptor),
                     v1_connector.into_connector_fn(),

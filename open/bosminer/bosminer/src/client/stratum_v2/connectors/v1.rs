@@ -45,10 +45,16 @@ use crate::error;
 pub(crate) struct Connector {
     /// Options required by the `TranslationHandler`
     translation_options: V2ToV1TranslationOptions,
+    /// Optional Upstream authority public key used for authenticating the endpoint and
+    /// running secure connection to V1 endpoint
+    upstream_authority_public_key: Option<v2::noise::AuthorityPublicKey>,
 }
 
 impl Connector {
-    pub fn new(extranonce_subscribe: bool) -> Self {
+    pub fn new(
+        extranonce_subscribe: bool,
+        upstream_authority_public_key: Option<v2::noise::AuthorityPublicKey>,
+    ) -> Self {
         Self {
             translation_options: V2ToV1TranslationOptions {
                 try_enable_xnsub: extranonce_subscribe,
@@ -56,6 +62,7 @@ impl Connector {
                 // that the connection can be dropped and reconnected somewhere else
                 propagate_reconnect_downstream: true,
             },
+            upstream_authority_public_key,
         }
     }
 
@@ -65,7 +72,20 @@ impl Connector {
     ) -> error::Result<(v2::DynFramedSink, v2::DynFramedStream)> {
         trace!("Stratum V1 connector: {:?}, {:?}", connection, self);
 
-        let v1_framed_connection = ii_wire::Connection::<v1::Framing>::new(connection).into_inner();
+        let v1_framed_connection =
+            if let Some(upstream_authority_public_key) = self.upstream_authority_public_key {
+                let noise_initiator =
+                    ii_stratum::v2::noise::Initiator::new(upstream_authority_public_key);
+
+                // Successful noise initiator handshake results in a stream/sink of V2 frames
+                noise_initiator
+                    .connect_with_codec(connection, |noise_codec| {
+                        <v1::framing::Framing as ii_wire::Framing>::Codec::new(Some(noise_codec))
+                    })
+                    .await?
+            } else {
+                ii_wire::Connection::<v1::Framing>::new(connection).into_inner()
+            };
 
         let (translation_handler, v2_translation_receiver, v2_translation_sender) =
             TranslationHandler::new(v1_framed_connection, self.translation_options);
