@@ -38,6 +38,7 @@ pub const URL_JAVA_SCRIPT_REGEX: &'static str =
 pub enum Protocol {
     Drain,
     StratumV1,
+    StratumV1Secure(v2::noise::auth::EncodedEd25519PublicKey),
     StratumV2(v2::noise::auth::EncodedEd25519PublicKey),
     StratumV2Insecure,
 }
@@ -45,6 +46,7 @@ pub enum Protocol {
 impl Protocol {
     pub const SCHEME_DRAIN: &'static str = "drain";
     pub const SCHEME_STRATUM_V1: &'static str = "stratum+tcp";
+    pub const SCHEME_STRATUM_V1_SECURE: &'static str = "stratum+tcp+secure";
     pub const SCHEME_STRATUM_V2: &'static str = "stratum2+tcp";
     pub const SCHEME_STRATUM_V2_INSECURE: &'static str = "stratum2+tcp+insecure";
 
@@ -57,6 +59,7 @@ impl Protocol {
         match self {
             Self::Drain => Self::DEFAULT_PORT_DRAIN,
             Self::StratumV1 => Self::DEFAULT_PORT_STRATUM_V1,
+            Self::StratumV1Secure(_) => Self::DEFAULT_PORT_STRATUM_V1,
             Self::StratumV2(_) => Self::DEFAULT_PORT_STRATUM_V2,
             Self::StratumV2Insecure => Self::DEFAULT_PORT_STRATUM_V2_INSECURE,
         }
@@ -74,19 +77,31 @@ impl Protocol {
             .map_err(Into::into)
     }
 
+    /// Extract public authority key from URL `path` component.
+    fn get_upstream_auth_public_key_from_path(
+        scheme: &str,
+        path: &str,
+    ) -> error::Result<v2::noise::auth::EncodedEd25519PublicKey> {
+        // Note, that the path contains the leading '/' that needs to be skipped
+        match path.get(1..) {
+            Some(s) => Self::get_upstream_auth_public_key_from_string(s),
+            None => Err(error::ErrorKind::Client(format!(
+                "missing upstream authority key for securing {} connection",
+                scheme
+            )))
+            .map_err(Into::into),
+        }
+    }
+
     pub fn parse(scheme: &str, path: &str) -> error::Result<Self> {
         Ok(match scheme {
             Self::SCHEME_DRAIN => Self::Drain,
             Self::SCHEME_STRATUM_V1 => Self::StratumV1,
+            Self::SCHEME_STRATUM_V1_SECURE => {
+                Self::StratumV1Secure(Self::get_upstream_auth_public_key_from_path(scheme, path)?)
+            }
             Self::SCHEME_STRATUM_V2 => {
-                let upstream_authority_public_key = match path.get(1..) {
-                    Some(s) => Self::get_upstream_auth_public_key_from_string(s)?,
-                    None => Err(error::ErrorKind::Client(format!(
-                        "missing upstream authority key for securing {} connection",
-                        scheme
-                    )))?,
-                };
-                Self::StratumV2(upstream_authority_public_key)
+                Self::StratumV2(Self::get_upstream_auth_public_key_from_path(scheme, path)?)
             }
             Self::SCHEME_STRATUM_V2_INSECURE => Self::StratumV2Insecure,
             _ => Err(error::ErrorKind::Client(format!(
@@ -100,6 +115,7 @@ impl Protocol {
         match self {
             Self::Drain => Self::SCHEME_DRAIN,
             Self::StratumV1 => Self::SCHEME_STRATUM_V1,
+            Self::StratumV1Secure(_) => Self::SCHEME_STRATUM_V1_SECURE,
             Self::StratumV2(_) => Self::SCHEME_STRATUM_V2,
             Self::StratumV2Insecure => Self::SCHEME_STRATUM_V2_INSECURE,
         }
@@ -111,6 +127,9 @@ impl fmt::Display for Protocol {
         match self {
             Protocol::Drain => write!(f, "Drain"),
             Protocol::StratumV1 => write!(f, "Stratum V1"),
+            Protocol::StratumV1Secure(public_key) => {
+                write!(f, "Stratum V1 Secure (authority key: {})", public_key)
+            }
             Protocol::StratumV2(public_key) => {
                 write!(f, "Stratum V2 (authority key: {})", public_key)
             }

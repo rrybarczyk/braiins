@@ -102,6 +102,25 @@ impl Handle {
                     channel,
                 ))
             }
+            // V1 with AEAD security provided by noise framework
+            ClientProtocol::StratumV1Secure(upstream_authority_public_key) => {
+                assert!(
+                    channel.is_none(),
+                    "BUG: protocol 'Stratum V1 Secure' does not support channel"
+                );
+                let extranonce_subscribe = descriptor.detect_xnsub();
+                let v1_connector = stratum_v2::connectors::v1::Connector::new(
+                    extranonce_subscribe,
+                    Some(upstream_authority_public_key.clone().into_inner()),
+                );
+                Arc::new(stratum_v2::StratumClient::new(
+                    stratum_v2::ConnectionDetails::from_descriptor(&descriptor),
+                    v1_connector.into_connector_fn(),
+                    backend_info,
+                    job_solver,
+                    channel,
+                ))
+            }
             // V2 with AEAD security provided by noise framework
             ClientProtocol::StratumV2(upstream_authority_public_key) => {
                 let noise_connector = stratum_v2::connectors::noise::Connector::new(
