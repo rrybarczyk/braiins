@@ -106,3 +106,20 @@ name = 'Default'
 #enabled = true
 # Set PSU power limit (in watts) for three hashboards and control board
 #psu_power_limit = 1420
+
+# Optional configuration to enable dynamic power scaling
+#[power_scaling]
+# Dynamic Power Scaling is not enabled by default
+#enabled = false
+# The `psu_power_limit` variable is lowered by `power_step` W each time miner
+# hits HOT temperature
+#power_step = 100
+# The `psu_power_limit` will never get below `min_psu_power_limit`
+#min_psu_power_limit = 800
+# If `psu_power_limit` is at `min_psu_power_limit` level and miner is still
+# HOT and `shutdown_enabled` is true, then miner is shut down for a period of
+# time. After that, miner is started but with the initial value of
+# `psu_power_limit`.
+#shutdown_enabled = true
+# `shutdown_duration` is in hours. The default time for shutdown is 3 hours.
+#shutdown_duration = 3.0
