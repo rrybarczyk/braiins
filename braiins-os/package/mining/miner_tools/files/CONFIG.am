@@ -28,11 +28,6 @@ network_conf="${mnt_dir}/config/network.conf"
 
 default_hostname="antMiner"
 
-get_bm_config() {
-	tr -d '\n' < "$bmminer_conf" | \
-	sed -n 's/.*"'$1'":[ "]*\([^ ",}]*\).*/\1/p'
-}
-
 get_net_config() {
 	sed -n '/'$1'=/s/.*=["]*\([^"]*\)["]*/\1/p' "$network_conf"
 }
@@ -49,30 +44,46 @@ antminer_cleanup() {
 # the mount is done during system pre-initialization phase
 [ -d "$mnt_dir" ] || return 0
 
-# save MAC address
-ETHADDR=$(cat "$ethaddr_conf")
+ethaddr=$(cat "$ethaddr_conf")
 
-if [ -z "$ETHADDR" ]; then
+if [ -z "$ethaddr" ]; then
 	# AntMiner rootfs is probably corrupted
 	antminer_cleanup
 	return 0
 fi
 
-# save network settings
-NET_HOSTNAME=$(get_net_config "hostname")
-NET_IP=$(get_net_config "ipaddress")
-NET_MASK=$(get_net_config "netmask")
-NET_GATEWAY=$(get_net_config "gateway")
-NET_DNS_SERVERS=$(get_net_config "dnsservers" | tr " " ,)
+if use_factory_cfg; then
+	# save MAC address
+	ETHADDR="$ethaddr"
+
+	# save network settings
+	NET_HOSTNAME=$(get_net_config "hostname")
+	NET_IP=$(get_net_config "ipaddress")
+	NET_MASK=$(get_net_config "netmask")
+	NET_GATEWAY=$(get_net_config "gateway")
+	NET_DNS_SERVERS=$(get_net_config "dnsservers" | tr " " ,)
+
+	if [ x"$KEEP_HOSTNAME" == x"cond" ]; then
+		# keep hostname only if it has been changed by user
+		[ x"$NET_HOSTNAME" == x"$default_hostname" ] && KEEP_HOSTNAME="no" || KEEP_HOSTNAME="yes"
+	fi
+fi
 
 # save all local settings
-MINER_FREQ=$(get_bm_config "bitmain-freq")
-MINER_VOLTAGE=$(get_bm_config "bitmain-voltage")
-MINER_FIXED_FREQ=$(get_bm_config "fixed-freq")
 
-if [ x"$KEEP_HOSTNAME" == x"cond" ]; then
-	# keep hostname only if it has been changed by user
-	[ x"$NET_HOSTNAME" == x"$default_hostname" ] && KEEP_HOSTNAME="no" || KEEP_HOSTNAME="yes"
+. /usr/share/libubox/jshn.sh
+
+json_init
+json_load "$(cat "$bmminer_conf")"
+
+if json_get_type Type "bitmain-freq" && [ "$Type" == string ]; then
+	json_get_var MINER_FREQ "bitmain-freq"
+fi
+if json_get_type Type "bitmain-voltage" && [ "$Type" == string ]; then
+	json_get_var MINER_VOLTAGE "bitmain-voltage"
+fi
+if json_get_type Type "fixed-freq" && [ "$Type" == string ]; then
+	json_get_var MINER_FIXED_FREQ "fixed-freq"
 fi
 
 antminer_cleanup

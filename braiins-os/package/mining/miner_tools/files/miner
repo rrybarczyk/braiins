@@ -98,9 +98,10 @@ fault_light() {
 nand_install() {
 	local firmware_tar="/usr/share/upgrade/firmware.tar.gz"
 	local stage1_script="stage1.sh"
+	local config="nand_install.cfg"
 
-	if [ $# -gt 0 ]; then
-		echo "command 'nand_install' does not take any argument" >&2
+	if [ $# -gt 1 -o \( $# -eq 1 -a "$1" != 'use_factory_cfg' \) ]; then
+		echo "command 'nand_install' takes only one argument 'use_factory_cfg' or none" >&2
 		exit 1
 	fi
 
@@ -130,6 +131,10 @@ nand_install() {
 
 	# prepare attributes for stage1 script
 	local miner_hwid=$(cat /tmp/miner_hwid)
+
+	# create configuration file
+	touch "$config"
+	[ "$1" == "use_factory_cfg" ] && echo "USE_FACTORY_CFG=yes" >> "$config"
 
 	echo "Running stage1 upgrade script..."
 	set +e

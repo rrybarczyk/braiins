@@ -22,6 +22,7 @@
 
 . /lib/zynq.sh
 . /lib/functions/bos-defaults.sh
+. nand_install.cfg
 
 flash_eraseall() {
 	mtd erase "$1"
@@ -34,6 +35,10 @@ file_size() {
 get_miner_cfg() {
 	bos get_factory_cfg "$1" 2>/dev/null
 	return 0
+}
+
+use_factory_cfg() {
+	test "$USE_FACTORY_CFG" == "yes"
 }
 
 SPL_OFF=0x0
@@ -78,25 +83,40 @@ echo "Restoring configuration from NAND..."
 # get target specific configuration
 . CONFIG
 
-# return when target specific configuration is successful
-[ x${CONFIG_RESULT} == x"success" ] && return 0
-
 # target specific configuration failed
 # try to recover configuration from 'miner_cfg' partition
 
-# get MAC from NAND or running system
-ETHADDR=$(get_miner_cfg "ethaddr")
-[ -n "$ETHADDR" ] || ETHADDR=$(cat /sys/class/net/eth0/address)
+if use_factory_cfg; then
+	if [ -z "$ETHADDR" ]; then
+		# get MAC from NAND or running system
+		ETHADDR=$(get_miner_cfg "ethaddr")
+		[ -n "$ETHADDR" ] || ETHADDR=$(cat /sys/class/net/eth0/address)
+	fi
 
-NET_HOSTNAME=$(get_miner_cfg "net_hostname")
-NET_IP=$(get_miner_cfg "net_ip")
-NET_MASK=$(get_miner_cfg "net_mask")
-NET_GATEWAY=$(get_miner_cfg "net_gateway")
-NET_DNS_SERVERS=$(get_miner_cfg "net_dns_servers")
+	if [ "$CONFIG_RESULT" != "success" ]; then
+		NET_HOSTNAME=$(get_miner_cfg "net_hostname")
+		NET_IP=$(get_miner_cfg "net_ip")
+		NET_MASK=$(get_miner_cfg "net_mask")
+		NET_GATEWAY=$(get_miner_cfg "net_gateway")
+		NET_DNS_SERVERS=$(get_miner_cfg "net_dns_servers")
+	fi
+else
+	ETHADDR=$(cat /sys/class/net/eth0/address)
 
-MINER_FREQ=$(get_miner_cfg "miner_freq")
-MINER_VOLTAGE=$(get_miner_cfg "miner_voltage")
-MINER_FIXED_FREQ=$(get_miner_cfg "miner_fixed_freq")
+	NET_HOSTNAME=$(uci -q get system.@system[0].hostname || true)
+	if [ "$(uci -q get network.lan.proto || true)" == "static" ]; then
+		NET_IP=$(uci -q get network.lan.ipaddr || true)
+		NET_MASK=$(uci -q get network.lan.netmask || true)
+		NET_GATEWAY=$(uci -q get network.lan.gateway || true)
+		NET_DNS_SERVERS=$(uci -q get network.lan.dns | tr " " ,)
+	fi
+fi
+
+if [ "$CONFIG_RESULT" != "success" ]; then
+	MINER_FREQ=$(get_miner_cfg "miner_freq")
+	MINER_VOLTAGE=$(get_miner_cfg "miner_voltage")
+	MINER_FIXED_FREQ=$(get_miner_cfg "miner_fixed_freq")
+fi
 
 if [ -z "$NET_HOSTNAME" ]; then
 	KEEP_HOSTNAME="no"
