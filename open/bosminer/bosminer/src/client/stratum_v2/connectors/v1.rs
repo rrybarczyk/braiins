@@ -30,7 +30,7 @@ use futures::select;
 use ii_async_utils::FutureExt;
 use ii_logging::macros::*;
 use ii_stratum::{v1, v2};
-use ii_stratum_proxy::translation::{V2ToV1Translation, V2ToV1TranslationOptions};
+use ii_stratum_proxy::translation::{Password, V2ToV1Translation, V2ToV1TranslationOptions};
 
 use pin_project::pin_project;
 use std::pin::Pin;
@@ -54,6 +54,7 @@ impl Connector {
     pub fn new(
         extranonce_subscribe: bool,
         upstream_authority_public_key: Option<v2::noise::AuthorityPublicKey>,
+        password: String,
     ) -> Self {
         Self {
             translation_options: V2ToV1TranslationOptions {
@@ -61,6 +62,7 @@ impl Connector {
                 // We want to receive the reconnect messages from the translation component so
                 // that the connection can be dropped and reconnected somewhere else
                 propagate_reconnect_downstream: true,
+                password: Password::new(&password),
             },
             upstream_authority_public_key,
         }
@@ -88,7 +90,11 @@ impl Connector {
             };
 
         let (translation_handler, v2_translation_receiver, v2_translation_sender) =
-            TranslationHandler::new(v1_framed_connection, self.translation_options);
+            TranslationHandler::new(
+                v1_framed_connection,
+                self.translation_options,
+                self.translation_options.password.to_opt_string(),
+            );
         tokio::spawn(async move {
             let status = translation_handler.run().await;
             debug!("V2->V1 translation terminated: {:?}", status);
@@ -212,6 +218,7 @@ impl TranslationHandler {
     fn new(
         v1_conn: v1::Framed,
         options: V2ToV1TranslationOptions,
+        password: String,
     ) -> (Self, mpsc::Receiver<v2::Frame>, mpsc::Sender<v2::Frame>) {
         let (v1_translation_sender, v1_translation_receiver) =
             mpsc::channel(Self::MAX_TRANSLATION_CHANNEL_SIZE);
@@ -220,8 +227,12 @@ impl TranslationHandler {
         let (v2_client_sender, v2_client_receiver) =
             mpsc::channel(Self::MAX_TRANSLATION_CHANNEL_SIZE);
 
-        let translation =
-            V2ToV1Translation::new(v1_translation_sender, v2_translation_sender, options);
+        let translation = V2ToV1Translation::new(
+            v1_translation_sender,
+            v2_translation_sender,
+            options,
+            password,
+        );
 
         (
             Self {
