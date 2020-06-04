@@ -155,7 +155,7 @@ pub enum DynamicPowerScaling {
     Disabled,
     InitialPowerLimit,
     ScaledPowerLimit(u32),
-    CoolingDownFor(Time),
+    CoolingDownEndsInDuration(Time),
 }
 
 /// Basic temperature control settings
