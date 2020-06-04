@@ -423,14 +423,23 @@ impl FlashFreq {
 }
 
 #[derive(Clone)]
-pub struct HashboardFlashChecksum(pub [u8; 32]);
+pub struct HashboardFlashChecksum([u8; 32]);
+
+impl From<&HashboardFlashChecksum> for u64 {
+    fn from(checksum: &HashboardFlashChecksum) -> u64 {
+        u64::from_le_bytes(checksum.0[0..8].try_into().expect("BUG: slice fail"))
+    }
+}
 
 impl std::fmt::Display for HashboardFlashChecksum {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for &b in &self.0[0..6] {
-            write!(f, "{:02x}", b)?;
-        }
-        Ok(())
+        write!(f, "{:16x}", u64::from(self))
+    }
+}
+
+impl From<[u8; 32]> for HashboardFlashChecksum {
+    fn from(data: [u8; 32]) -> Self {
+        Self(data)
     }
 }
 
