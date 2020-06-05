@@ -63,23 +63,23 @@ upgrade() {
 		exit 1
 	fi
 
-	echo "Starting check for new firmware upgrade..." >&2
+	echo "Starting check for new firmware upgrade..."
 	opkg update 2>&1 || true
 	# wait some time to check for new upgrades in 'inotifyd' script
 	sleep 1
 	local fw_transition=$(cat "/tmp/bos_upgrade" 2>/dev/null)
 	if [ -n "$fw_transition" ]; then
-		echo "New firmware upgrade was found!" >&2
-		echo "$fw_transition" >&2
+		echo "New firmware upgrade was found!"
+		echo "$fw_transition"
 		# check configuration if auto-upgrade is enabled
 		if [ "$1" != "auto" -o "$(auto_upgrade_status)" == "on" ]; then
-			echo "Running firmware upgrade..." >&2
+			echo "Running firmware upgrade..."
 			opkg install firmware 2>&1
 		else
-			echo "Auto-upgrade is disabled, skipping firmware upgrade!" >&2
+			echo "Auto-upgrade is disabled, skipping firmware upgrade!"
 		fi
 	else
-		echo "No new firmware upgrade was found!" >&2
+		echo "No new firmware upgrade was found!"
 	fi
 }
 
@@ -177,7 +177,7 @@ nightly_feeds() {
 	case $1 in
 		on)
 			if [ $(nightly_feeds_status "$record") == "on" ]; then
-				echo "Nightly feeds are already enabled!" >&2
+				echo "Nightly feeds are already enabled!"
 			else
 				file=$(list_disabled_feeds "$record" | tail -n1)
 				if [ -z "$file" ]; then
@@ -185,18 +185,18 @@ nightly_feeds() {
 					exit 1
 				fi
 				sed -i 's/^[#]\+[ ]*\([^ ]\+ '"$record"' .*\)/\1/' "$file"
-				echo "Enabling nightly record '$record' in '$file'" >&2
+				echo "Enabling nightly record '$record' in '$file'"
 			fi
 		;;
 		off)
 			if [ $(nightly_feeds_status "$record") == "off" ]; then
-				echo "Nightly feeds are already disabled!" >&2
+				echo "Nightly feeds are already disabled!"
 			else
 				list_enabled_feeds "$record" | \
 				# comment all enabled feed records
 				while IFS= read -r file; do
 					sed -i 's/\(^[^ ]\+ '"$record"' .*\)/# \1/' "$file"
-					echo "Disabling nightly record '$record' in '$file'" >&2
+					echo "Disabling nightly record '$record' in '$file'"
 					disabled="yes"
 				done
 			fi
@@ -219,17 +219,17 @@ auto_upgrade() {
 	case $1 in
 		on)
 			if [ $(auto_upgrade_status) == "on" ]; then
-				echo "Auto-upgrade is already enabled!" >&2
+				echo "Auto-upgrade is already enabled!"
 			else
-				echo "Enabling auto-upgrade" >&2
+				echo "Enabling auto-upgrade"
 				auto_upgrade_set '1'
 			fi
 		;;
 		off)
 			if [ $(auto_upgrade_status) == "off" ]; then
-				echo "Auto-upgrade is already disabled!" >&2
+				echo "Auto-upgrade is already disabled!"
 			else
-				echo "Disabling auto-upgrade" >&2
+				echo "Disabling auto-upgrade"
 				auto_upgrade_set '0'
 			fi
 		;;
