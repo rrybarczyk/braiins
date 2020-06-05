@@ -57,6 +57,55 @@ auto_upgrade_set() {
 	EOF
 }
 
+# TODO: move it to different package because it is miner specific
+is_tuning() (
+	. /usr/share/libubox/jshn.sh
+	set -e
+
+	is_tuning_status() {
+		case "$1" in
+			"Testing "*|\
+			"Tuning "*)
+				true
+			;;
+			*)
+				false
+			;;
+		esac
+	}
+
+	local status chain chains
+
+	json_init
+	json_load "$(echo -n '{"command":"tunerstatus"}' | \
+		nc localhost 4028 2>/dev/null || echo "{}")"
+
+	json_select STATUS
+		json_select 1
+			json_get_var status "STATUS"
+		json_select ..
+	json_select ..
+
+	# the command is probably not supported
+	[ "$status" == "S" ] || return 1
+
+	json_select TUNERSTATUS
+		json_select 1
+			json_get_keys chains "TunerChainStatus"
+			json_select TunerChainStatus
+				for chain in $chains; do
+					json_select "$chain"
+						json_get_var status "Status"
+						is_tuning_status "$status" && return 0
+					json_select ..
+				done
+			json_select ..
+		json_select ..
+	json_select ..
+
+	return 1
+)
+
 upgrade() {
 	if [ $# -gt 1 -o \( $# -eq 1 -a "$1" != 'auto' \) ]; then
 		echo "command 'upgrade' takes only one argument 'auto' or none" >&2
@@ -71,12 +120,21 @@ upgrade() {
 	if [ -n "$fw_transition" ]; then
 		echo "New firmware upgrade was found!"
 		echo "$fw_transition"
-		# check configuration if auto-upgrade is enabled
-		if [ "$1" != "auto" -o "$(auto_upgrade_status)" == "on" ]; then
-			echo "Running firmware upgrade..."
-			opkg install firmware 2>&1
+		local skip_msg=
+		if [ "$1" == "auto" ]; then
+			# check configuration if auto-upgrade is enabled
+			if [ "$(auto_upgrade_status)" == "off" ]; then
+				skip_msg="Auto-upgrade is disabled"
+			# or tuning is running
+			elif is_tuning; then
+				skip_msg="Miner tuning is running"
+			fi
+		fi
+		if [ -z "$skip_msg" ]; then
+				echo "Running firmware upgrade..."
+				opkg install firmware 2>&1
 		else
-			echo "Auto-upgrade is disabled, skipping firmware upgrade!"
+			echo "$skip_msg, skipping firmware upgrade!"
 		fi
 	else
 		echo "No new firmware upgrade was found!"
