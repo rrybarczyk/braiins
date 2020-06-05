@@ -71,18 +71,16 @@ fi
 
 # save all local settings
 
-. /usr/share/libubox/jshn.sh
-
 json_init
 json_load "$(cat "$bmminer_conf")"
 
-if json_get_type Type "bitmain-freq" && [ "$Type" == string ]; then
+if json_is_a "bitmain-freq" string; then
 	json_get_var MINER_FREQ "bitmain-freq"
 fi
-if json_get_type Type "bitmain-voltage" && [ "$Type" == string ]; then
+if json_is_a "bitmain-voltage" string; then
 	json_get_var MINER_VOLTAGE "bitmain-voltage"
 fi
-if json_get_type Type "fixed-freq" && [ "$Type" == string ]; then
+if json_is_a "fixed-freq" string; then
 	json_get_var MINER_FIXED_FREQ "fixed-freq"
 fi
 

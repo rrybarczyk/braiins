@@ -22,6 +22,7 @@
 
 . /lib/zynq.sh
 . /lib/functions/bos-defaults.sh
+. /usr/share/libubox/jshn.sh
 . nand_install.cfg
 
 flash_eraseall() {
@@ -83,9 +84,61 @@ echo "Restoring configuration from NAND..."
 # get target specific configuration
 . CONFIG
 
+STAGE3_DIR="upgrade"
+STAGE3_TMP="stage3"
+STAGE3_DST="$STAGE3_TMP/$STAGE3_DIR"
+STAGE3_SCRIPT="stage3.sh"
+
+BOSMINER_CFG="bosminer.toml"
+BOSMINER_CFG_PATH="/etc/$BOSMINER_CFG"
+
+has_substr() {
+	case "$2" in
+		*"$1"*) true;;
+		*) false;;
+	esac
+}
+
+# find first slushpool URL and return its userinfo (user.workername)
+get_pool_user() {
+	local group groups pool pools
+	local url user
+
+	if json_is_a group array; then
+		json_get_keys groups "group"
+		json_select group
+
+		for group in $groups; do
+			json_select "$group"
+				if json_is_a pool array; then
+					json_get_keys pools "pool"
+					json_select pool
+
+					for pool in $pools; do
+						json_select "$pool"
+							json_get_var url "url"
+							json_get_var user "user"
+
+							if has_substr "slushpool" "$url" && \
+							   has_substr "." "$user"; then
+								echo "$user"
+								return 0
+							fi
+						json_select ..
+					done
+
+					json_select ..
+				fi
+			json_select ..
+		done
+
+		json_select ..
+	fi
+	return 0
+}
+
 # target specific configuration failed
 # try to recover configuration from 'miner_cfg' partition
-
 if use_factory_cfg; then
 	if [ -z "$ETHADDR" ]; then
 		# get MAC from NAND or running system
@@ -110,7 +163,51 @@ else
 		NET_GATEWAY=$(uci -q get network.lan.gateway || true)
 		NET_DNS_SERVERS=$(uci -q get network.lan.dns | tr " " ,)
 	fi
+
+	# try to get BOSminer settings
+	json_init
+	json_load "$(bosminer config --data)"
+
+	json_select status
+		json_get_var status_code "code"
+	json_select ..
+	if [ "$status_code" == "0" ]; then
+		json_select data
+		if json_is_a autotuning object; then
+			json_select autotuning
+				if json_is_a psu_power_limit int; then
+					json_get_var MINER_PSU_POWER_LIMIT "psu_power_limit"
+				fi
+			json_select ..
+		fi
+		MINER_POOL_USER=$(get_pool_user)
+		json_select ..
+	fi
+
+	# create stage3 tarball to preserve BOSminer configuration
+	if [ -f "$BOSMINER_CFG_PATH" ]; then
+		mkdir -p "$STAGE3_DST"
+		cp "$BOSMINER_CFG_PATH" "$STAGE3_DST"
+		cat > "$STAGE3_DST/$STAGE3_SCRIPT" <<-END
+			/bin/sh
+
+			cp -f "$BOSMINER_CFG" "$BOSMINER_CFG_PATH"
+		END
+		tar czf "$STAGE3_FIRMWARE" "$STAGE3_DIR" -C "$STAGE3_TMP"
+		rm -rf "$STAGE3_DST"
+	fi
 fi
+
+AUTO_UPGRADE=yes
+[ $(get_miner_cfg "bos_auto_upgrade_enable") == '0' ] && AUTO_UPGRADE=no
+
+if [ -z "$MINER_PSU_POWER_LIMIT" ]; then
+	# try to get PSU power limit from NAND or use 'default' value when it is missing
+	MINER_PSU_POWER_LIMIT=$(get_miner_cfg "miner_psu_power_limit")
+	MINER_PSU_POWER_LIMIT=${MINER_PSU_POWER_LIMIT:-default}
+fi
+
+[ -z "$MINER_POOL_USER" ] && MINER_POOL_USER=$(get_miner_cfg "miner_pool_user")
 
 if [ "$CONFIG_RESULT" != "success" ]; then
 	MINER_FREQ=$(get_miner_cfg "miner_freq")
