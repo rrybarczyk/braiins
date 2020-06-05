@@ -35,9 +35,11 @@ core:
     - luci-app-miner
     - luci-base
     - luci-lib-ip
+    - luci-lib-json
     - luci-lib-jsonc
     - luci-lib-nixio
     - luci-mod-admin-full
+    - luci-mod-rpc
     - luci-proto-ipv6
     - luci-theme-bosminer
     - luci-theme-bosminer-common

@@ -54,6 +54,8 @@ fields = [
     # autotuning
     'autotuning',
     'power_limit',
+    # non-bosminer options
+    'auto_upgrade',
     # password is never loaded, but can be changed
     'password',
 ]
@@ -89,6 +91,9 @@ def main(args):
                         continue
                     print('Pulling from %s (%d/%d)' % (host, line_no, total))
                     api = BosApi(host, args.user, args.password)
+                    out['auto_upgrade'] = toggle2str(
+                        api.uci_get_bool('bos', 'auto_upgrade', 'enable')
+                    )
                     cfg = api.get_config()
 
                     # output row data
@@ -120,6 +125,7 @@ def main(args):
                     password = row['password'].strip()
                     if line_no == 1 and host == fields[0] or host == '':
                         continue
+                    auto_upgrade = str2toggle(row['auto_upgrade'])
                     print('Pushing to %s (%d/%d)' % (host, line_no, total))
 
                     api = BosApi(host, args.user, args.password)
@@ -128,6 +134,11 @@ def main(args):
                     csvizer.push(row)
                     if not args.check:
                         api.set_config(csvizer.cfg)
+                        if auto_upgrade is not None:
+                            api.uci_set_bool(
+                                'bos', 'auto_upgrade', 'enable', auto_upgrade
+                            )
+                            api.uci_commit('bos')
                         if args.action == 'save_apply':
                             api.apply_config()
                         # password is part of system administration, not miner config
@@ -452,6 +463,7 @@ class BosApi:
         self.username = username
         self.password = password
         self.auth()
+        self.rpc_id_counter = 0
 
     def check_config(self, data):
         """Check if retrieved config is in known format"""
@@ -472,6 +484,7 @@ class BosApi:
         return url
 
     def auth(self):
+        """Acquire an authentication token"""
         response = requests.post(
             self.get_url('/cgi-bin/luci/'),
             data={'luci_username': self.username, 'luci_password': self.password},
@@ -482,6 +495,7 @@ class BosApi:
         self.authcookie = response.cookies.copy()
 
     def get_config(self):
+        """Load miner config"""
         response = requests.get(
             self.get_url('/cgi-bin/luci/admin/miner/cfg_data'),
             cookies=self.authcookie,
@@ -495,6 +509,7 @@ class BosApi:
         return document['data']
 
     def set_config(self, data):
+        """Write miner config"""
         data['format']['generator'] = 'multiconfiger 0.1'  #
         response = requests.post(
             self.get_url('/cgi-bin/luci/admin/miner/cfg_save'),
@@ -509,6 +524,7 @@ class BosApi:
         # print(response.content)
 
     def apply_config(self):
+        """Restart bosminer"""
         response = requests.post(
             self.get_url('/cgi-bin/luci/admin/miner/cfg_apply'),
             cookies=self.authcookie,
@@ -519,6 +535,47 @@ class BosApi:
         document = response.json()
         if document.get('status', {}).get('code') != 0:
             raise ConfigApplyFailed(document)
+
+    def uci_rpc(self, method, *args):
+        """Perform UCI rpc call"""
+        # see https://github.com/openwrt/luci/wiki/JsonRpcHowTo
+        rpc = {'method': method, 'params': args, 'id': self.rpc_id()}
+        response = requests.post(
+            self.get_url('/cgi-bin/luci/rpc/uci'),
+            cookies=self.authcookie,
+            allow_redirects=False,
+            data=json.dumps(rpc),
+        )
+        response.raise_for_status()
+        document = response.json()
+        if document.get('id') != rpc['id']:
+            raise RpcError('mismatched rpc call (%s)' % document.get('id'))
+        if document.get('error'):
+            raise RpcError(document.get('error'))
+        return document.get('result')
+
+    def rpc_id(self):
+        """Provide unique id required by json-rpc spec"""
+        self.rpc_id_counter += 1
+        return self.rpc_id_counter
+
+    def uci_commit(self, config):
+        return self.uci_rpc('commit', config)
+
+    def uci_get(self, config, section, option):
+        return self.uci_rpc('get', config, section, option)
+
+    def uci_set(self, config, section, option, value):
+        return self.uci_rpc('set', config, section, option, value)
+
+    def uci_get_bool(self, config, section, option):
+        value = self.uci_get(config, section, option)
+        if value not in ('0', '1'):
+            raise RpcError('Invalid bool value: %s' % value)
+        return value == '1'
+
+    def uci_set_bool(self, config, section, option, value):
+        self.uci_set(config, section, option, '1' if value else '0')
 
     def set_password(self, password):
 
@@ -591,6 +648,10 @@ class ConfigStoreFailed(ErrorResponse):
 
 class ConfigApplyFailed(ErrorResponse):
     hint = 'miner state change failed'
+
+
+class RpcError(BosApiError):
+    pass
 
 
 # --- helper functions --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
