@@ -146,6 +146,7 @@ pub struct TunerChainStatus {
     #[serde(rename = "TunerRunning")]
     pub tuner_running: bool,
     #[serde(rename = "LoadedProfileCreatedOn")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub loaded_profile_created_on: Option<Time>,
 }
 
