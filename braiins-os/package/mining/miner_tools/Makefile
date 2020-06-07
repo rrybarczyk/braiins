@@ -47,13 +47,13 @@ endef
 
 ifneq (,$(filter am1-s9 am2-s15 am2-s17,$(SUBTARGET)))
 define Package/miner_tools/subtarget_install
-	$(CP) ./files/CONFIG.am $(1)/usr/share/upgrade/CONFIG
+	$(INSTALL_DATA) ./files/CONFIG.am $(1)/usr/share/upgrade/CONFIG
 endef
 endif
 
 ifneq (,$(filter dm1-g9 dm1-g19 dm1-g29,$(SUBTARGET)))
 define Package/miner_tools/subtarget_install
-	$(CP) ./files/CONFIG.dm $(1)/usr/share/upgrade/CONFIG
+	$(INSTALL_DATA) ./files/CONFIG.dm $(1)/usr/share/upgrade/CONFIG
 endef
 endif
 
@@ -61,7 +61,7 @@ define Package/miner_tools/install
 	$(INSTALL_DIR) $(1)/usr/sbin
 	$(INSTALL_BIN) ./files/miner $(1)/usr/sbin/
 	$(INSTALL_DIR) $(1)/usr/share/upgrade
-	$(CP) ./files/CONTROL $(1)/usr/share/upgrade/CONTROL.bos
+	$(INSTALL_DATA) ./files/CONTROL $(1)/usr/share/upgrade/CONTROL.bos
 	$(call Package/miner_tools/subtarget_install,$(1))
 endef
 

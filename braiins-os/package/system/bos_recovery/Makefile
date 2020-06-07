@@ -45,7 +45,7 @@ endef
 
 define Package/bos_recovery/install
 	$(INSTALL_DIR) $(1)/etc/
-	$(CP) ./files/bos_mode $(1)/etc/
+	$(INSTALL_DATA) ./files/bos_mode $(1)/etc/
 
 	$(INSTALL_DIR) $(1)/etc/profile.d/
 	$(INSTALL_BIN) ./files/bos_recovery.profile $(1)/etc/profile.d/bos_recovery.sh

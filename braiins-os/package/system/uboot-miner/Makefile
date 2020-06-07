@@ -164,9 +164,9 @@ endef
 define Package/uboot/install/default
 	$(INSTALL_DIR) $(BIN_DIR)/uboot-$(BOARD)-$(1)
 
-	$(CP) $(PKG_BUILD_DIR)/spl/boot.bin \
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/spl/boot.bin \
 		$(BIN_DIR)/uboot-$(BOARD)-$(1)
-	$(CP) $(PKG_BUILD_DIR)/u-boot.img \
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/u-boot.img \
 		$(BIN_DIR)/uboot-$(BOARD)-$(1)
 endef
 

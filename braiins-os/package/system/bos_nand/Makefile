@@ -40,7 +40,7 @@ endef
 
 define Package/bos_nand/install
 	$(INSTALL_DIR) $(1)/etc/
-	$(CP) ./files/bos_mode $(1)/etc/
+	$(INSTALL_DATA) ./files/bos_mode $(1)/etc/
 
 	$(INSTALL_DIR) $(1)/etc/init.d/
 	$(INSTALL_BIN) ./files/post_upgrade.init $(1)/etc/init.d/post_upgrade

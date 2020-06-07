@@ -44,7 +44,7 @@ endef
 
 define Package/bos_upgrade/install
 	$(INSTALL_DIR) $(1)/etc/
-	$(CP) ./files/bos_mode $(1)/etc/
+	$(INSTALL_DATA) ./files/bos_mode $(1)/etc/
 
 	$(INSTALL_DIR) $(1)/usr/sbin
 	$(INSTALL_BIN) ./files/bos_upgrade.sh $(1)/usr/sbin/
