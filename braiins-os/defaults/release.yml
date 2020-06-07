@@ -71,6 +71,7 @@ firmware_upgrade:
     - at
     - libelf1
     - bos_autoupgrade
+    - luci-app-bos-upgrade
 
 # image package lists
 image_sd:
