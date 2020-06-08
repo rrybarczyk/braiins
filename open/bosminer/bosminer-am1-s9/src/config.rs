@@ -72,7 +72,13 @@ pub const ASYNC_LOGGER_DRAIN_CHANNEL_SIZE: usize = 4096;
 pub const DEFAULT_CONFIG_PATH: &'static str = "/etc/bosminer.toml";
 
 /// Default Hardware ID path
-pub const DEFAULT_HW_ID_PATH: &'static str = "/tmp/miner_hwid";
+pub const HW_ID_PATH: &'static str = "/tmp/miner_hwid";
+
+/// Default BOS version path
+pub const BOS_VERSION_PATH: &'static str = "/etc/bos_version";
+
+/// Default BOS version path
+pub const BOARD_NAME_PATH: &'static str = "/var/sysinfo/board_name";
 
 /// Default value for hash chain enabled flag
 pub const DEFAULT_HASH_CHAIN_ENABLED: bool = true;
@@ -504,9 +510,13 @@ impl Backend {
     where
         T: ConfigBody,
     {
-        self.info.hw_rev = HW_MODEL.to_string();
-        self.info.dev_id = fs::read_to_string(DEFAULT_HW_ID_PATH)?.trim().to_string();
-        self.info.fw_ver = format!("{} {}", T::variant(), bosminer::version::STRING.to_string());
+        self.info.hw_revision = HW_MODEL.to_string();
+        self.info.fw_version =
+            format!("{} {}", T::variant(), bosminer::version::STRING.to_string());
+        self.info.dev_id = fs::read_to_string(HW_ID_PATH)?.trim().to_string();
+        self.info.bos_version = fs::read_to_string(BOS_VERSION_PATH)?.trim().to_string();
+        self.info.board_name = fs::read_to_string(BOARD_NAME_PATH)?.trim().to_string();
+
         Ok(())
     }
 }

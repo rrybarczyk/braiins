@@ -58,22 +58,26 @@ pub type WorkNode<T> = node::WorkSolverType<
 #[derive(Debug, Clone)]
 pub struct BackendInfo {
     pub vendor: String,
-    pub hw_rev: String,
-    pub fw_ver: String,
+    pub hw_revision: String,
+    pub fw_version: String,
     pub dev_id: String,
+    pub bos_version: String,
+    pub board_name: String,
 }
 
 impl Default for BackendInfo {
     fn default() -> Self {
         Self {
             vendor: crate::VENDOR.to_string(),
-            hw_rev: Default::default(),
-            fw_ver: format!(
+            hw_revision: Default::default(),
+            fw_version: format!(
                 "{} {}",
                 crate::SIGNATURE,
                 crate::version::STRING.to_string()
             ),
             dev_id: Default::default(),
+            bos_version: Default::default(),
+            board_name: Default::default(),
         }
     }
 }
@@ -86,11 +90,11 @@ impl From<BackendInfo> for DeviceInfo {
                 .try_into()
                 .expect("BUG: cannot convert 'DeviceInfo::vendor'"),
             hw_rev: info
-                .hw_rev
+                .hw_revision
                 .try_into()
                 .expect("BUG: cannot convert 'DeviceInfo::hw_rev'"),
             fw_ver: info
-                .fw_ver
+                .fw_version
                 .try_into()
                 .expect("BUG: cannot convert 'DeviceInfo::fw_ver'"),
             dev_id: info
