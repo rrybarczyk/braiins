@@ -93,7 +93,6 @@ impl Connector {
             TranslationHandler::new(
                 v1_framed_connection,
                 self.translation_options,
-                self.translation_options.password.to_opt_string(),
             );
         tokio::spawn(async move {
             let status = translation_handler.run().await;
@@ -218,7 +217,6 @@ impl TranslationHandler {
     fn new(
         v1_conn: v1::Framed,
         options: V2ToV1TranslationOptions,
-        password: String,
     ) -> (Self, mpsc::Receiver<v2::Frame>, mpsc::Sender<v2::Frame>) {
         let (v1_translation_sender, v1_translation_receiver) =
             mpsc::channel(Self::MAX_TRANSLATION_CHANNEL_SIZE);
@@ -231,7 +229,6 @@ impl TranslationHandler {
             v1_translation_sender,
             v2_translation_sender,
             options,
-            password,
         );
 
         (
