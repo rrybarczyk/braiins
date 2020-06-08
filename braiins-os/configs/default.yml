@@ -39,9 +39,9 @@ build:
   # build version which can be accessed with tag '{build_version}'
   version: 20.06
   # suffix added to firmware version
-  version_suffix: -{build_version}-nightly
+  version_suffix: -20.06-rc
   # record used in feeds to distinguish current build
-  feeds_record: bos_firmware_nightly
+  feeds_record: bos_firmware_rc
   # file with default OpenWrt configuration
   config: defaults/release.conf
   # file with list of packages for build images
