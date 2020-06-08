@@ -993,11 +993,14 @@ impl HashChain {
     }
 
     pub async fn reset_counter(&self) {
+        self.common_io.reset_error_counter();
         self.counter.lock().await.reset();
     }
 
     pub async fn snapshot_counter(&self) -> counters::HashChain {
-        self.counter.lock().await.snapshot()
+        // Fetch FPGA error counter and add it to snapshot results
+        let bm13xx_crc_errors = self.common_io.get_error_counter() as usize;
+        self.counter.lock().await.snapshot(bm13xx_crc_errors)
     }
 
     pub async fn get_frequency(&self) -> FrequencySettings {

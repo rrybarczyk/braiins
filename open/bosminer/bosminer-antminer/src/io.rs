@@ -596,6 +596,20 @@ impl Common {
         }
     }
 
+    /// Reads error counter
+    #[inline]
+    pub fn get_error_counter(&self) -> u32 {
+        self.regs.err_counter.read().bits()
+    }
+
+    /// Resets error counter
+    #[inline]
+    pub fn reset_error_counter(&self) {
+        self.regs
+            .ctrl_reg
+            .modify(|_, w| w.err_cnt_clear().bit(true));
+    }
+
     #[inline]
     pub fn enable_ip_core(&self) {
         self.regs.ctrl_reg.modify(|_, w| w.enable().bit(true));

@@ -82,6 +82,7 @@ pub struct HashChain {
     pub started: Instant,
     pub stopped: Option<Instant>,
     pub asic_difficulty: usize,
+    pub bm13xx_crc_errors: usize,
 }
 
 impl HashChain {
@@ -93,6 +94,7 @@ impl HashChain {
             stopped: None,
             chip: vec![Chip::new(); chip_count],
             asic_difficulty,
+            bm13xx_crc_errors: 0,
         }
     }
 
@@ -108,9 +110,10 @@ impl HashChain {
     /// Create a snapshot of the current state of counters.
     /// This will set stopped time to current timestamp so that the hashrate will not decay
     /// from this moment on.
-    pub fn snapshot(&self) -> Self {
+    pub fn snapshot(&self, bm13xx_crc_errors: usize) -> Self {
         let mut snapshot = self.clone();
         snapshot.stopped = Some(Instant::now());
+        snapshot.bm13xx_crc_errors = bm13xx_crc_errors;
         snapshot
     }
 
