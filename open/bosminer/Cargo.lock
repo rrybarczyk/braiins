@@ -254,7 +254,7 @@ dependencies = [
 
 [[package]]
 name = "bosminer"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait 0.1.24 (registry+https://github.com/rust-lang/crates.io-index)",
  "atomic_enum 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -281,12 +281,12 @@ dependencies = [
 
 [[package]]
 name = "bosminer-am1-s9"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "approx 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "async-trait 0.1.24 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitcoin_hashes 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "bosminer 0.1.0",
+ "bosminer 0.2.0",
  "bosminer-antminer 0.1.0",
  "bosminer-config 0.1.0",
  "bosminer-macros 0.1.0",
@@ -322,7 +322,7 @@ version = "0.1.0"
 dependencies = [
  "approx 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "async-trait 0.1.24 (registry+https://github.com/rust-lang/crates.io-index)",
- "bosminer 0.1.0",
+ "bosminer 0.2.0",
  "bosminer-macros 0.1.0",
  "chrono 0.4.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.6",
@@ -357,7 +357,7 @@ dependencies = [
 name = "bosminer-erupter"
 version = "0.1.0"
 dependencies = [
- "bosminer 0.1.0",
+ "bosminer 0.2.0",
  "bosminer-config 0.1.0",
  "bosminer-macros 0.1.0",
  "config 0.9.3 (registry+https://github.com/rust-lang/crates.io-index)",
