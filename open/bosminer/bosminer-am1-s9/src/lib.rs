@@ -421,6 +421,7 @@ pub struct Manager {
     owned_by: StdMutex<Option<&'static str>>,
     pub inner: Mutex<ManagerInner>,
     pub chain_config: config::ResolvedChainConfig,
+    pub backend_info: hal::BackendInfo,
 }
 
 impl Manager {
@@ -675,6 +676,7 @@ impl Backend {
                             .expect("failed to make pin"),
                         plug_pin: hashchain::PlugPin::open(&gpio_mgr, hashboard_idx)
                             .expect("failed to make pin"),
+                        backend_info: backend_config.info.clone(),
                         voltage_ctrl_backend: voltage_ctrl_backend.clone(),
                         hashboard_idx,
                         midstate_count: chain_config.midstate_count,
