@@ -739,6 +739,39 @@ impl Core {
     }
 }
 
+pub struct GlitchMonitor {
+    /// Registers of Glitch Monitor Peripheral
+    regs: uio_async::UioTypedMapping<ii_fpga_io_am1_s9::glitch_monitor::RegisterBlock>,
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct GlitchData {
+    pub chan: [u32; 6],
+}
+
+impl GlitchMonitor {
+    pub fn new() -> error::Result<Self> {
+        let uio = uio::Device::open(uio::Type::GlitchMonitor)?;
+        Ok(Self { regs: uio.map()? })
+    }
+
+    /// Read glitch counters
+    pub fn read(&self) -> GlitchData {
+        GlitchData {
+            // TODO: figure out how to generate the SVD in a way that can be read via index
+            // TODO: more channels?
+            chan: [
+                self.regs.ch0_cnt.read().bits(),
+                self.regs.ch1_cnt.read().bits(),
+                self.regs.ch2_cnt.read().bits(),
+                self.regs.ch3_cnt.read().bits(),
+                self.regs.ch4_cnt.read().bits(),
+                self.regs.ch5_cnt.read().bits(),
+            ],
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
