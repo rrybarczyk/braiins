@@ -32,19 +32,33 @@ pub struct Device {
 }
 
 pub enum Type {
-    Common,
-    WorkRx,
-    WorkTx,
-    Command,
+    Common(usize),
+    WorkRx(usize),
+    WorkTx(usize),
+    Command(usize),
+    GlitchMonitor,
 }
 
 impl Type {
-    fn as_str(&self) -> &str {
+    fn per_hashchain_instance(&self, name: &'static str, hashboard_idx: usize) -> String {
+        assert!(
+            hashboard_idx > 0,
+            "BUG: hashboard_idx not greater than zero"
+        );
+        format!("chain{}-{}", hashboard_idx, name)
+    }
+
+    fn shared_instance(&self, name: &'static str) -> String {
+        format!("miner-{}", name)
+    }
+
+    fn to_uio_name(&self) -> String {
         match self {
-            &Type::Common => "common",
-            &Type::WorkRx => "work-rx",
-            &Type::WorkTx => "work-tx",
-            &Type::Command => "cmd-rx",
+            &Type::Common(i) => self.per_hashchain_instance("common", i),
+            &Type::WorkRx(i) => self.per_hashchain_instance("work-rx", i),
+            &Type::WorkTx(i) => self.per_hashchain_instance("work-tx", i),
+            &Type::Command(i) => self.per_hashchain_instance("cmd-rx", i),
+            &Type::GlitchMonitor => self.shared_instance("glitch-monitor"),
         }
     }
 }
@@ -55,9 +69,8 @@ impl Device {
     /// * `hashboard_idx` - one-based hashboard index (same as connector number:
     ///   connector J8 means `hashboard_idx=8`)
     /// * `uio_type` - type of uio device, determines what IO block to map
-    pub fn open(hashboard_idx: usize, uio_type: Type) -> error::Result<Self> {
-        assert!(hashboard_idx > 0);
-        let uio_name = format!("chain{}-{}", hashboard_idx, uio_type.as_str());
+    pub fn open(uio_type: Type) -> error::Result<Self> {
+        let uio_name = uio_type.to_uio_name();
         let uio = uio_async::UioDevice::open_by_name(&uio_name).with_context(|_| {
             ErrorKind::UioDevice(uio_name.clone(), "cannot find uio device".to_string())
         })?;
@@ -89,16 +102,16 @@ mod test {
     /// device-tree so that we have something to open.
     #[test]
     fn test_lookup_uio() {
-        Device::open(TEST_CHAIN_INDEX, Type::Command).expect("uio open failed");
+        Device::open(Type::Command(TEST_CHAIN_INDEX)).expect("TODO: uio open failed");
     }
 
     /// Try mapping memory from UIO device.
     #[test]
     fn test_map_uio() {
-        let _mem: uio_async::UioTypedMapping<u8> = Device::open(TEST_CHAIN_INDEX, Type::Common)
-            .expect("uio open failed")
+        let _mem: uio_async::UioTypedMapping<u8> = Device::open(Type::Common(TEST_CHAIN_INDEX))
+            .expect("TODO: uio open failed")
             .map()
-            .expect("mapping failed");
+            .expect("TODO: mapping failed");
     }
 
     /// Try to map memory twice.
@@ -107,20 +120,20 @@ mod test {
     #[test]
     fn test_map_uio_twice_checklock() {
         // haha! this should fail
-        let _: uio_async::UioTypedMapping<u8> = Device::open(TEST_CHAIN_INDEX, Type::Common)
-            .expect("uio open failed")
+        let _: uio_async::UioTypedMapping<u8> = Device::open(Type::Common(TEST_CHAIN_INDEX))
+            .expect("TODO: uio open failed")
             .map()
-            .expect("mapping failed");
-        let _: uio_async::UioTypedMapping<u8> = Device::open(TEST_CHAIN_INDEX, Type::Common)
-            .expect("uio open failed")
+            .expect("TODO: mapping failed");
+        let _: uio_async::UioTypedMapping<u8> = Device::open(Type::Common(TEST_CHAIN_INDEX))
+            .expect("TODO: uio open failed")
             .map()
-            .expect("mapping failed");
+            .expect("TODO: mapping failed");
     }
 
     /// Try to map IRQ.
     #[test]
     fn test_map_irq() {
-        Device::open(TEST_CHAIN_INDEX, Type::Command).expect("uio open failed");
+        Device::open(Type::Command(TEST_CHAIN_INDEX)).expect("TODO: uio open failed");
     }
 
     fn flush_interrupts() {
@@ -136,14 +149,14 @@ mod test {
     #[test]
     fn test_get_irq() {
         flush_interrupts();
-        let uio = Device::open(TEST_CHAIN_INDEX, Type::WorkTx)
-            .expect("uio open failed")
+        let uio = Device::open(Type::WorkTx(TEST_CHAIN_INDEX))
+            .expect("TODO: uio open failed")
             .uio;
-        uio.irq_enable().expect("irq enable failed");
+        uio.irq_enable().expect("TODO: irq enable failed");
         let res = uio
             .irq_wait_timeout(FIFO_READ_TIMEOUT)
-            .expect("waiting for timeout failed");
-        assert!(res.is_some(), "expected interrupt");
+            .expect("TODO: waiting for timeout failed");
+        assert!(res.is_some(), "TODO: expected interrupt");
     }
 
     /// Test that we get timeout when waiting for IRQ.
@@ -153,13 +166,13 @@ mod test {
         flush_interrupts();
 
         // cmd rx fifo now shouldn't get any interrupts (it's empty)
-        let uio = Device::open(TEST_CHAIN_INDEX, Type::WorkRx)
-            .expect("uio open failed")
+        let uio = Device::open(Type::WorkRx(TEST_CHAIN_INDEX))
+            .expect("TODO: uio open failed")
             .uio;
-        uio.irq_enable().expect("irq enable failed");
+        uio.irq_enable().expect("TODO: irq enable failed");
         let res = uio
             .irq_wait_timeout(FIFO_READ_TIMEOUT)
-            .expect("waiting for timeout failed");
-        assert!(res.is_none(), "expected timeout");
+            .expect("TODO: waiting for timeout failed");
+        assert!(res.is_none(), "BUG: expected timeout");
     }
 }

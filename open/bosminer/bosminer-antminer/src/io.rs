@@ -184,7 +184,7 @@ impl WorkRxFifo {
     }
 
     pub fn new(hashboard_idx: usize) -> error::Result<Self> {
-        let uio = uio::Device::open(hashboard_idx, uio::Type::WorkRx)?;
+        let uio = uio::Device::open(uio::Type::WorkRx(hashboard_idx))?;
         Ok(Self {
             regs: uio.map()?,
             uio: uio.uio,
@@ -262,7 +262,7 @@ impl WorkTxFifo {
     }
 
     pub fn new(hashboard_idx: usize) -> error::Result<Self> {
-        let uio = uio::Device::open(hashboard_idx, uio::Type::WorkTx)?;
+        let uio = uio::Device::open(uio::Type::WorkTx(hashboard_idx))?;
         Ok(Self {
             regs: uio.map()?,
             uio: uio.uio,
@@ -360,7 +360,7 @@ impl CommandRxTxFifos {
     }
 
     pub fn new(hashboard_idx: usize) -> error::Result<Self> {
-        let uio = uio::Device::open(hashboard_idx, uio::Type::Command)?;
+        let uio = uio::Device::open(uio::Type::Command(hashboard_idx))?;
         Ok(Self {
             regs: uio.map()?,
             uio: uio.uio,
@@ -691,7 +691,7 @@ impl Common {
     }
 
     fn new(hashboard_idx: usize, midstate_count: MidstateCount) -> error::Result<Self> {
-        let uio = uio::Device::open(hashboard_idx, uio::Type::Common)?;
+        let uio = uio::Device::open(uio::Type::Common(hashboard_idx))?;
         Ok(Self {
             regs: uio.map()?,
             midstate_count,
