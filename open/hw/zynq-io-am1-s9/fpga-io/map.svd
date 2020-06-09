@@ -512,5 +512,59 @@
         </register>
       </registers>
     </peripheral>
+    <peripheral>
+      <name>GLITCH_MONITOR</name>
+      <description>Braiins AXI Glitch Monitor v1.0</description>
+      <groupName>HASHCHAIN</groupName>
+      <baseAddress>0</baseAddress>
+      <size>32</size>
+      <access>read-write</access>
+      <addressBlock>
+        <offset>0</offset>
+        <size>0x80</size>
+        <usage>registers</usage>
+      </addressBlock>
+      <registers>
+        <register>
+          <name>CTRL_REG</name>
+          <description>Control Register</description>
+          <addressOffset>0x00</addressOffset>
+          <size>32</size>
+          <access>read-write</access>
+          <resetValue>0x0</resetValue>
+          <resetMask>0xffffffff</resetMask>
+          <fields>
+            <field>
+              <name>CNT_CLEAR</name>
+              <access>write-only</access>
+              <description>Clear all counters</description>
+              <bitRange>[0:0]</bitRange>
+            </field>
+          </fields>
+        </register>
+        <register>
+          <dim>14</dim>
+          <dimIncrement>8</dimIncrement>
+          <name>CH[%s]_CNT</name>
+          <description>Channel Glitch Counter</description>
+          <addressOffset>0x10</addressOffset>
+          <size>32</size>
+          <access>read-only</access>
+          <resetValue>0x0</resetValue>
+          <resetMask>0xffffffff</resetMask>
+        </register>
+        <register>
+          <dim>14</dim>
+          <dimIncrement>8</dimIncrement>
+          <name>CH[%s]_WIDTH</name>
+          <description>Channel Last Glitch Width</description>
+          <addressOffset>0x14</addressOffset>
+          <size>32</size>
+          <access>read-only</access>
+          <resetValue>0x0</resetValue>
+          <resetMask>0xffffffff</resetMask>
+        </register>
+      </registers>
+    </peripheral>
   </peripherals>
 </device>
