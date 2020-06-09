@@ -510,12 +510,11 @@ impl Backend {
     where
         T: ConfigBody,
     {
-        self.info.hw_revision = HW_MODEL.to_string();
-        self.info.fw_version =
-            format!("{} {}", T::variant(), bosminer::version::STRING.to_string());
-        self.info.dev_id = fs::read_to_string(HW_ID_PATH)?.trim().to_string();
-        self.info.bos_version = fs::read_to_string(BOS_VERSION_PATH)?.trim().to_string();
-        self.info.board_name = fs::read_to_string(BOARD_NAME_PATH)?.trim().to_string();
+        self.info.os_version = fs::read_to_string(BOS_VERSION_PATH)?.trim().to_string();
+        self.info.hw_model = HW_MODEL.to_string();
+        self.info.platform_name = fs::read_to_string(BOARD_NAME_PATH)?.trim().to_string();
+        self.info.device_id = fs::read_to_string(HW_ID_PATH)?.trim().to_string();
+        self.info.bosminer_signature = Some(T::variant());
 
         Ok(())
     }

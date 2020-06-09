@@ -27,3 +27,13 @@ use once_cell::sync::Lazy;
 // TODO: create special proc-macro which returns constant string
 pub static STRING: Lazy<String> =
     Lazy::new(|| format!(concat!(env!("CARGO_PKG_VERSION"), "-{}"), git_version!()));
+
+/// Format full software name along allowing an optional override of the signature with an
+/// alternative `signature` followed by version
+pub fn format_signature_and_version(signature: Option<String>) -> String {
+    format!(
+        "{} {}",
+        signature.unwrap_or(crate::SIGNATURE.to_string()),
+        crate::version::STRING.to_string()
+    )
+}

@@ -57,27 +57,29 @@ pub type WorkNode<T> = node::WorkSolverType<
 
 #[derive(Debug, Clone)]
 pub struct BackendInfo {
-    pub vendor: String,
-    pub hw_revision: String,
-    pub fw_version: String,
-    pub dev_id: String,
-    pub bos_version: String,
-    pub board_name: String,
+    /// Operating system version running BOSminer for a specific backend
+    pub os_version: String,
+    /// Commercial name of the hardware model
+    pub hw_model: String,
+    /// Internal identifier of the platform
+    pub platform_name: String,
+    /// Unique identifier of the device
+    pub device_id: String,
+    /// Backend may optionally override the software signature
+    /// TODO: this is not appropriate as at most we should allow the backend to provide only
+    /// option suffix. Rename this field to bosminer_signature_suffix and adjust the signature
+    /// handling throught the software stack as needed.
+    pub bosminer_signature: Option<String>,
 }
 
 impl Default for BackendInfo {
     fn default() -> Self {
         Self {
-            vendor: crate::VENDOR.to_string(),
-            hw_revision: Default::default(),
-            fw_version: format!(
-                "{} {}",
-                crate::SIGNATURE,
-                crate::version::STRING.to_string()
-            ),
-            dev_id: Default::default(),
-            bos_version: Default::default(),
-            board_name: Default::default(),
+            os_version: Default::default(),
+            hw_model: Default::default(),
+            platform_name: Default::default(),
+            device_id: Default::default(),
+            bosminer_signature: None,
         }
     }
 }
@@ -85,20 +87,23 @@ impl Default for BackendInfo {
 impl From<BackendInfo> for DeviceInfo {
     fn from(info: BackendInfo) -> DeviceInfo {
         DeviceInfo {
-            vendor: info
-                .vendor
+            vendor: crate::VENDOR
+                .to_string()
                 .try_into()
                 .expect("BUG: cannot convert 'DeviceInfo::vendor'"),
             hw_rev: info
-                .hw_revision
+                .hw_model
                 .try_into()
                 .expect("BUG: cannot convert 'DeviceInfo::hw_rev'"),
-            fw_ver: info
-                .fw_version
-                .try_into()
-                .expect("BUG: cannot convert 'DeviceInfo::fw_ver'"),
+            fw_ver: format!(
+                "{};{}",
+                info.os_version,
+                crate::version::format_signature_and_version(info.bosminer_signature)
+            )
+            .try_into()
+            .expect("BUG: cannot convert 'DeviceInfo::fw_ver'"),
             dev_id: info
-                .dev_id
+                .device_id
                 .try_into()
                 .expect("BUG: cannot convert 'DeviceInfo::dev_id'"),
         }
