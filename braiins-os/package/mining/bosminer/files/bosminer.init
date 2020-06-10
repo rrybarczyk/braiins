@@ -27,6 +27,7 @@ START=99
 USE_PROCD=1
 PROG=/usr/bin/bosminer
 CONF=/etc/bosminer.toml
+CONF_TMP=${CONF}_tmp
 
 . /lib/functions/bos-defaults.sh
 
@@ -68,28 +69,28 @@ generate_pools() {
 
 		if [ $stratum -eq 0 ] || ! has_substr "://" "$pool_url"; then
 			if [ $stratum -eq 0 ]; then
-				cat >> "$CONF" <<-END
+				cat >> "$CONF_TMP" <<-END
 
 					[[group.pool]]
 					url = '${pool_url}'
 				END
 			else
-				cat >> "$CONF" <<-END
+				cat >> "$CONF_TMP" <<-END
 
 					[[group.pool]]
 					# url = '${pool_url}'
 					url = 'stratum+tcp://${pool_url}'
 				END
 			fi
-			cat >> "$CONF" <<-END
+			cat >> "$CONF_TMP" <<-END
 				user = '${pool_user:-!non-existent-user!}'
 			END
 			[ -n "$pool_pass" ] && \
-			cat >> "$CONF" <<-END
+			cat >> "$CONF_TMP" <<-END
 				password = '${pool_pass}'
 			END
 		else
-			cat >> "$CONF" <<-END
+			cat >> "$CONF_TMP" <<-END
 
 				# Incompatible pool
 				# [[group.pool]]
@@ -97,7 +98,7 @@ generate_pools() {
 				# user = '${pool_user}'
 			END
 			[ -n "$pool_pass" ] && \
-			cat >> "$CONF" <<-END
+			cat >> "$CONF_TMP" <<-END
 				# password = '${pool_pass}'
 			END
 		fi
@@ -165,7 +166,7 @@ boot()
 				;;
 		esac
 
-		cat > "$CONF" <<-END
+		cat > "$CONF_TMP" <<-END
 			[format]
 			version = '1.${minor}${plus}'
 			model = '${model}'
@@ -174,18 +175,18 @@ boot()
 		END
 		# applies only to AM1
 		[ "$miner_fixed_freq" == "true" -a -n "$miner_freq" ] && \
-		cat >> "$CONF" <<-END
+		cat >> "$CONF_TMP" <<-END
 
 			[hash_chain_global]
 			frequency = ${miner_freq}
 		END
-		cat >> "$CONF" <<-END
+		cat >> "$CONF_TMP" <<-END
 
 			[[group]]
 			name = 'Default'
 		END
 		[ -n "$pool_user" ] && \
-		cat >> "$CONF" <<-END
+		cat >> "$CONF_TMP" <<-END
 
 			[[group.pool]]
 			url = '${pool_host}${pool_port:+:$pool_port}${pool_path:+/$pool_path}'
@@ -196,21 +197,23 @@ boot()
 			user = '${pool_user}'
 		END
 		[ -n "$pool_user" -a -n "$pool_pass" ] && \
-		cat >> "$CONF" <<-END
+		cat >> "$CONF_TMP" <<-END
 			password = '${pool_pass}'
 		END
 		generate_pools $pool_count
 		[ -n "$plus" -a "$autotuning_enabled" == "yes" ] && \
-		cat >> "$CONF" <<-END
+		cat >> "$CONF_TMP" <<-END
 
 			[autotuning]
 			enabled = true
 		END
 		[ -n "$plus" -a -n "$miner_psu_power_limit" ] && \
-		cat >> "$CONF" <<-END
+		cat >> "$CONF_TMP" <<-END
 			psu_power_limit = ${miner_psu_power_limit}
 		END
 	fi
+	mv "$CONF_TMP" "$CONF"
+	fsync "$CONF"
 	start "$@"
 }
 
