@@ -114,6 +114,8 @@ impl HashChain {
             chip.reset();
         }
         self.started = Instant::now();
+        self.uart_crc_errors = 0;
+        self.glitches = Default::default();
     }
 
     /// Create a snapshot of the current state of counters.
