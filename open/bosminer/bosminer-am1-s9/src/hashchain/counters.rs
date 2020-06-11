@@ -74,6 +74,13 @@ impl Chip {
     }
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct Glitches {
+    pub i2c_sda: usize,
+    pub i2c_scl: usize,
+    pub uart_rx: usize,
+}
+
 #[derive(Clone)]
 pub struct HashChain {
     pub chip: Vec<Chip>,
@@ -82,7 +89,8 @@ pub struct HashChain {
     pub started: Instant,
     pub stopped: Option<Instant>,
     pub asic_difficulty: usize,
-    pub bm13xx_crc_errors: usize,
+    pub glitches: Glitches,
+    pub uart_crc_errors: usize,
 }
 
 impl HashChain {
@@ -94,7 +102,8 @@ impl HashChain {
             stopped: None,
             chip: vec![Chip::new(); chip_count],
             asic_difficulty,
-            bm13xx_crc_errors: 0,
+            glitches: Default::default(),
+            uart_crc_errors: 0,
         }
     }
 
@@ -110,10 +119,9 @@ impl HashChain {
     /// Create a snapshot of the current state of counters.
     /// This will set stopped time to current timestamp so that the hashrate will not decay
     /// from this moment on.
-    pub fn snapshot(&self, bm13xx_crc_errors: usize) -> Self {
+    pub fn snapshot(&self) -> Self {
         let mut snapshot = self.clone();
         snapshot.stopped = Some(Instant::now());
-        snapshot.bm13xx_crc_errors = bm13xx_crc_errors;
         snapshot
     }
 
@@ -143,6 +151,16 @@ impl HashChain {
         self.errors += 1;
         self.chip[addr.chip].errors += 1;
         self.chip[addr.chip].core[addr.core].errors += 1;
+    }
+
+    pub fn add_glitches(&mut self, glitches: &Glitches) {
+        self.glitches.i2c_sda += glitches.i2c_sda;
+        self.glitches.i2c_scl += glitches.i2c_scl;
+        self.glitches.uart_rx += glitches.uart_rx;
+    }
+
+    pub fn add_uart_crc_errors(&mut self, uart_crc_errors: usize) {
+        self.uart_crc_errors += uart_crc_errors;
     }
 
     pub fn set_chip_count(&mut self, chip_count: usize) {
