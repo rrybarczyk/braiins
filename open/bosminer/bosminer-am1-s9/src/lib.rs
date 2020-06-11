@@ -581,6 +581,11 @@ pub struct Backend {
 }
 
 impl Backend {
+    /// How often to fetch and report on glitches
+    const GLITCH_INFO_INTERVAL: Duration = Duration::from_secs(120);
+    /// Threshold of glitches (per interval) when to print info
+    const MAX_GLITCH_PER_SECOND: usize = 1;
+
     pub fn new() -> Self {
         Self {
             work_solver_stats: Default::default(),
@@ -598,6 +603,24 @@ impl Backend {
             }
         }
         Ok(detected)
+    }
+
+    /// Task to periodicaly check on glitches and eventually report to user
+    async fn glitch_info_task(mut glitch_monitor: hashchain::glitch::Monitor) {
+        let threshold =
+            Self::MAX_GLITCH_PER_SECOND * (Self::GLITCH_INFO_INTERVAL.as_secs() as usize);
+        loop {
+            delay_for(Self::GLITCH_INFO_INTERVAL).await;
+
+            let data = glitch_monitor.fetch_new();
+            let sum = data.i2c_scl + data.i2c_sda + data.j6_rx + data.j7_rx + data.j8_rx;
+            if sum > threshold {
+                warn!(
+                    "Number of glitches is above threshold: SDA={} SCL={} J6={} J7={} J8={}",
+                    data.i2c_sda, data.i2c_scl, data.j6_rx, data.j7_rx, data.j8_rx
+                );
+            }
+        }
     }
 
     /// Miner termination handler called when app is shutdown.
@@ -647,6 +670,10 @@ impl Backend {
         )
         .await;
         hooks.clone().monitor_started(monitor.clone()).await;
+
+        // Glitch monitor (only to get info message)
+        let glitch_monitor =
+            hashchain::glitch::Monitor::open().expect("TODO: failed to open glitch monitor");
 
         let voltage_ctrl_backend = Arc::new(power::I2cBackend::new(0));
         let mut managers = Vec::new();
@@ -731,6 +758,13 @@ impl Backend {
                 });
             }
         }
+
+        // Spawn glitch monitor info task
+        halt_receiver
+            .register_client("hashchain".into())
+            .await
+            .spawn(Self::glitch_info_task(glitch_monitor));
+
         hooks.miner_started().await;
         (managers, monitor)
     }
