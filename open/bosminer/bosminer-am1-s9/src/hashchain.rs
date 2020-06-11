@@ -24,6 +24,7 @@
 
 pub mod counters;
 pub mod frequency;
+pub mod glitch;
 
 pub use frequency::FrequencySettings;
 
@@ -269,9 +270,13 @@ pub struct HashChain {
     halt_receiver: halt::Receiver,
     /// Current hashchain settings
     pub frequency: Mutex<FrequencySettings>,
+    glitch_monitor: Mutex<glitch::Monitor>,
 }
 
 impl HashChain {
+    /// How often to update glitch information?
+    const GLITCH_UPDATE_INTERVAL: Duration = Duration::from_secs(5);
+
     /// Creates a new hashboard controller with memory mapped FPGA IP core
     ///
     /// * `gpio_mgr` - gpio manager used for producing pins required for hashboard control
@@ -333,7 +338,23 @@ impl HashChain {
             halt_sender,
             halt_receiver,
             frequency: Mutex::new(FrequencySettings::from_frequency(0)),
+            glitch_monitor: Mutex::new(glitch::Monitor::open()?),
         })
+    }
+
+    pub async fn update_fpga_errors(&self) {
+        let uart_crc_errors = self.common_io.get_error_counter() as usize;
+        self.common_io.reset_error_counter();
+        let glitches = self
+            .glitch_monitor
+            .lock()
+            .await
+            .fetch_new()
+            .get_glitches_for_hashboard(self.hashboard_idx);
+
+        let mut counter = self.counter.lock().await;
+        counter.add_uart_crc_errors(uart_crc_errors);
+        counter.add_glitches(&glitches);
     }
 
     pub fn current_temperature(&self) -> temperature::Hashboard {
@@ -946,6 +967,13 @@ impl HashChain {
         }
     }
 
+    async fn glitch_monitor_task(self: Arc<Self>) {
+        loop {
+            self.update_fpga_errors().await;
+            delay_for(Self::GLITCH_UPDATE_INTERVAL).await;
+        }
+    }
+
     pub async fn start(
         self: Arc<Self>,
         work_generator: work::Generator,
@@ -990,6 +1018,12 @@ impl HashChain {
             .register_client("temperature monitor".into())
             .await
             .spawn(Self::monitor_watchdog_temp_task(self.clone()));
+
+        // Spawn glitch monitor task
+        self.halt_receiver
+            .register_client("glitch monitor".into())
+            .await
+            .spawn(Self::glitch_monitor_task(self.clone()));
     }
 
     pub async fn reset_counter(&self) {
