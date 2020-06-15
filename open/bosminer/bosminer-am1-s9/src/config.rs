@@ -121,7 +121,7 @@ pub const HASH_CHAIN_INDEX_MAX: usize = 8;
 
 /// Range of PLL frequency for clocking the chips in MHz
 pub const FREQUENCY_MHZ_MIN: f64 = 200.0;
-pub const FREQUENCY_MHZ_MAX: f64 = 900.0;
+pub const FREQUENCY_MHZ_MAX: f64 = 1000.0;
 
 /// Range of hash chain voltage
 pub const VOLTAGE_V_MIN: f64 = 7.95;
