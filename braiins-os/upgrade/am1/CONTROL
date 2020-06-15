@@ -65,6 +65,7 @@ ANTMINER_VER=$(sed -n 2p /usr/bin/compile_time)
 
 case "$ANTMINER_VER" in
 	"Antminer S9"|\
+	"Antminer S9 (vnish "*")"|\
 	"Antminer S9i"|\
 	"Antminer S9j"|\
 	"Antminer R4")
