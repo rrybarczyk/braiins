@@ -17,6 +17,7 @@ This release aims to improve the usability of Braiins OS and BOS Toolbox by impl
 
 - [feature] We have switched back to Xilinx I2C IP core for communication with voltage controllers and extended it with glitch filtering for noisy environments
 - [feature] UART Rx line for communicating with hashing chips has been extended with glitch filtering
+- [feature] Upper limit for frequency setting has been raised to 1 GHz
 
 
 # 2020-04-30-2-b4a98a54
