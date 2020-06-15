@@ -135,7 +135,8 @@ def main(args):
                     if not args.check:
                         api.set_config(csvizer.cfg)
                         if auto_upgrade is not None:
-                            api.uci_set_bool(
+                            api.uci_init_section('bos', 'auto_upgrade', 'bos')
+                            ret = api.uci_set_bool(
                                 'bos', 'auto_upgrade', 'enable', auto_upgrade
                             )
                             api.uci_commit('bos')
@@ -562,6 +563,11 @@ class BosApi:
     def uci_commit(self, config):
         return self.uci_rpc('commit', config)
 
+    def uci_init_section(self, config, section, type):
+        """Create section if it does not exist"""
+        if self.rpc('uci', 'get', config, section) is None:
+            self.rpc('uci', 'set', config, section, type)
+
     def uci_get(self, config, section, option):
         return self.uci_rpc('get', config, section, option)
 
@@ -570,12 +576,13 @@ class BosApi:
 
     def uci_get_bool(self, config, section, option):
         value = self.uci_get(config, section, option)
-        if value not in ('0', '1'):
+        # may get nil if option or section is not present
+        if value not in ('0', '1', None):
             raise RpcError('Invalid bool value: %s' % value)
-        return value == '1'
+        return {'0': False, '1': True}.get(value)
 
     def uci_set_bool(self, config, section, option, value):
-        self.uci_set(config, section, option, '1' if value else '0')
+        return self.uci_set(config, section, option, '1' if value else '0')
 
     def set_password(self, password):
 
