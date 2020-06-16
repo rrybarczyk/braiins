@@ -25,6 +25,7 @@
 import argparse
 import sys
 import warnings
+import logging
 
 import upgrade2bos
 import restore2factory
@@ -63,6 +64,8 @@ if __name__ == '__main__':
     warnings.filterwarnings('ignore', category=DeprecationWarning, module='paramiko')
     # silence cryptography deprecation warning from asyncssh in discover
     warnings.filterwarnings('ignore', module='asyncssh')
+    # asyncio have spam problem on windows
+    logging.getLogger("asyncio").disabled=True
 
     # execute only if run as a script
     parser = argparse.ArgumentParser(

@@ -30,6 +30,7 @@ import asyncio
 import json
 import sys
 import warnings
+import logging
 
 from asyncssh import create_connection
 from asyncssh.misc import async_context_manager
@@ -345,14 +346,19 @@ async def asyncssh_connect(host, port, passwords):
     last_error = None
     for password in itertools.chain(passwords.get(host, []), passwords.get(ALL_HOSTS, [])):
         try:
+            # NOTE: asyncssh have various trouble with ~/.ssh on windows
+            # known_hosts and client_keys can probably be enabled on fresh versions
             conn, _ = await create_connection(None, host, port, username='root',
                                               password=password,
-                                              known_hosts=None)
+                                              known_hosts=None,
+                                              client_keys=None)
             break
         except asyncssh.misc.DisconnectError as e:
+            last_error = e
             if e.code == asyncssh.DISC_NO_MORE_AUTH_METHODS_AVAILABLE:
-                last_error = e
                 continue
+        except Exception as e:
+            last_error = e
     else:
         raise last_error
 
@@ -365,10 +371,10 @@ async def asyncssh_run(conn, *args, cat=True):
 
 
 async def detect_device(args, hostname, verbose):
-    if not await detect_ssh(hostname):
-        return
-
     try:
+        if not await detect_ssh(hostname):
+            return
+
         async with asyncssh_connect(hostname, 22, args.passwords) as conn:
             for info_cls in [BosInfo, AmInfo, DmInfo]:
                 device_info = await info_cls.create(conn)
@@ -497,6 +503,8 @@ def build_arg_parser(parser):
 def main(args):
     # rid of obnoxisou deperaction warnings
     warnings.filterwarnings('ignore', module='asyncssh')
+    # asyncio have spam problem on windows
+    logging.getLogger("asyncio").disabled=True
     # set arguments
     # call sub-command
     args.func(args)
